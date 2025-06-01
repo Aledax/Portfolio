@@ -23,9 +23,12 @@ function init() {
     renderer.setSize(window.innerWidth, window.innerHeight);
     
     document.body.appendChild(renderer.domElement);
-    document.addEventListener('mousedown', onDocumentMouseDown, false);
-    document.addEventListener('mouseup', onDocumentMouseUp, false);
-    document.addEventListener('mousemove', onDocumentMouseMove, false);
+    document.addEventListener('mousedown', e => onPress(e.clientX, e.clientY), false);
+    document.addEventListener('mouseup', e => onRelease(e.clientX, e.clientY), false);
+    document.addEventListener('mousemove', e => onMove(e.clientX, e.clientY), false);
+    document.addEventListener('touchstart', e => onPress(e.touches[0].clientX, e.touches[0].clientY), false);
+    document.addEventListener('touchend', e => onRelease(e.touches[0].clientX, e.touches[0].clientY), false);
+    document.addEventListener('touchmove', e => onMove(e.touches[0].clientX, e.touches[0].clientY), false);
 
     window.addEventListener('resize', onWindowResize, false);
 
@@ -51,42 +54,25 @@ function animate() {
     renderer.render(scene, camera);
 }
 
-function onDocumentMouseDown(event) {
+function onPress(x, y) {
 
-    event.preventDefault();
-
-    switch(event.which) {
-        case 1:
-            mousedown = true;
-            break;
-    }
+    mousedown = true;
 }
 
-function onDocumentMouseUp(event) {
+function onRelease(x, y) {
 
-    event.preventDefault();
-
-    switch(event.which) {
-        case 1:
-            mousedown = false;
-            break;
-    }
+    mousedown = false;
 }
 
-function onDocumentMouseMove(event) {
-
-    event.preventDefault();
-
-    var thisX = event.clientX;
-    var thisY = event.clientY;
+function onMove(x, y) {
 
     if (mousedown) {
-        cube.rotation.y += rotationMultiplier * (thisX - lastX);
-        cube.rotation.x = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, cube.rotation.x + rotationMultiplier * (thisY - lastY)));
+        cube.rotation.y += rotationMultiplier * (x - lastX);
+        cube.rotation.x = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, cube.rotation.x + rotationMultiplier * (y - lastY)));
     }
 
-    lastX = event.clientX;
-    lastY = event.clientY;
+    lastX = x;
+    lastY = y;
 }
 
 function onWindowResize() {
