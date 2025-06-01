@@ -1,5 +1,7 @@
 body {
     background-color: black;
+    background-image: url('../assets/images/background3.png');
+    background-size: 500px;
     margin: 0px;
     padding: 0px;
     height: 100vh;
