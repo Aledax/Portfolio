@@ -59,12 +59,14 @@ const shapeFrontFragmentShader = `
     void main() {
         float maxLightFactor = 0.75;
         float minDarkFactor = 0.25;
+        vec3 lightSourceDirection = vec3(-0.25, 1.0, 0.0);
+        float lightSourceFacing = dot(lightSourceDirection, vNormal);
         float lightFactor = 0.0;
         float darkFactor = 1.0;
-        if (vNormal.y >= 0.0) {
-            lightFactor = vNormal.y * maxLightFactor;
+        if (lightSourceFacing >= 0.0) {
+            lightFactor = lightSourceFacing * maxLightFactor;
         } else {
-            darkFactor = 1.0 + vNormal.y * (1.0 - minDarkFactor);
+            darkFactor = 1.0 + lightSourceFacing * (1.0 - minDarkFactor);
         }
 
         float edgeCloseness = vBarycentric.y;
