@@ -1,26 +1,97 @@
 import * as THREE from 'https://unpkg.com/three@0.160.0/build/three.module.js';
 
-const scene = new THREE.Scene();
-const camera = new THREE.PerspectiveCamera(
-    75,
-    window.innerWidth/window.innerHeight,
-    0.1,
-    1000);
-const renderer = new THREE.WebGLRenderer();
-renderer.setSize(window.innerWidth, window.innerHeight);
-document.body.appendChild(renderer.domElement);
+var scene, camera, renderer;
+var cube;
 
-const geometry = new THREE.BoxGeometry();
-const material = new THREE.MeshNormalMaterial();
-const cube = new THREE.Mesh(geometry, material);
-scene.add(cube);
+var rotationMultiplier = 0.0075;
 
-camera.position.z = 5;
+var mousedown = false;
+var lastX = 0;
+var lastY = 0;
+
+init();
+
+function init() {
+
+    scene = new THREE.Scene();
+    camera = new THREE.PerspectiveCamera(
+        75,
+        window.innerWidth/window.innerHeight,
+        0.1,
+        1000);
+    renderer = new THREE.WebGLRenderer();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    
+    document.body.appendChild(renderer.domElement);
+    document.addEventListener('mousedown', onDocumentMouseDown, false);
+    document.addEventListener('mouseup', onDocumentMouseUp, false);
+    document.addEventListener('mousemove', onDocumentMouseMove, false);
+
+    window.addEventListener('resize', onWindowResize, false);
+
+    const geometry = new THREE.BoxGeometry();
+    const material = new THREE.MeshNormalMaterial();
+    cube = new THREE.Mesh(geometry, material);
+    scene.add(cube);
+
+    camera.position.z = 5;
+
+    animate();
+}
 
 function animate() {
+
     requestAnimationFrame(animate);
-    cube.rotation.x += 0.01;
-    cube.rotation.y += 0.01;
+
+    // if (mousedown) {
+    //     cube.rotation.x += 0.01;
+    //     cube.rotation.y += 0.01;
+    // }
+
     renderer.render(scene, camera);
 }
-animate();
+
+function onDocumentMouseDown(event) {
+
+    event.preventDefault();
+
+    switch(event.which) {
+        case 1:
+            mousedown = true;
+            break;
+    }
+}
+
+function onDocumentMouseUp(event) {
+
+    event.preventDefault();
+
+    switch(event.which) {
+        case 1:
+            mousedown = false;
+            break;
+    }
+}
+
+function onDocumentMouseMove(event) {
+
+    event.preventDefault();
+
+    var thisX = event.clientX;
+    var thisY = event.clientY;
+
+    if (mousedown) {
+        cube.rotation.y += rotationMultiplier * (thisX - lastX);
+        cube.rotation.x = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, cube.rotation.x + rotationMultiplier * (thisY - lastY)));
+    }
+
+    lastX = event.clientX;
+    lastY = event.clientY;
+}
+
+function onWindowResize() {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+
+    renderer.setSize(window.innerWidth, window.innerHeight);
+}
