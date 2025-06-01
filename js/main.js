@@ -47,7 +47,7 @@ const shapeBackFragmentShader = `
         } else {
             alpha = transparentAlpha;
         }
-        gl_FragColor = vec4(vec3(0.0, 0.7, 1.0) * lighting, alpha);
+        gl_FragColor = vec4(vec3(0.0, 0.65, 1.0) * lighting, alpha);
     }
 `
 
@@ -80,7 +80,7 @@ const shapeFrontFragmentShader = `
         } else {
             alpha = transparentAlpha;
         }
-        gl_FragColor = vec4((vec3(0.0, (0.6 + lightFactor / 1.5) * (darkFactor + ((1.0 - darkFactor) / 1.5)), 1.0) + lightFactor) * darkFactor, alpha);
+        gl_FragColor = vec4((vec3(0.0, (0.65 + lightFactor / 1.5) * (darkFactor + ((1.0 - darkFactor) / 1.5)), 1.0) + lightFactor) * darkFactor, alpha);
     }
 `
 
