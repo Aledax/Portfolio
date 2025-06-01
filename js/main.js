@@ -1,13 +1,20 @@
 import * as THREE from 'https://unpkg.com/three@0.160.0/build/three.module.js';
 
-var scene, camera, renderer;
-var cube;
+var scene, camera, renderer, clock;
+var shapeZPivot, shape;
 
-var rotationMultiplier = 0.0075;
+const rotationMultiplier = 0.005;
+const shapePosition = new THREE.Vector3(0, 0, 0);
+const shapeRadius = 1;
+const shapeFloatAmplitude = 0.0025;
+const shapeFloatPeriod = 5;
+const shapeFloatRotationAmplitude = 0.05;
+const shapeFloatRotationOffset = shapeFloatPeriod / 2;
 
 var mousedown = false;
-var lastX = 0;
-var lastY = 0;
+var mousepos = new THREE.Vector2();
+var scenemousepos = new THREE.Vector2();
+var raycaster = new THREE.Raycaster();
 
 init();
 
@@ -15,13 +22,15 @@ function init() {
 
     scene = new THREE.Scene();
     camera = new THREE.PerspectiveCamera(
-        75,
+        40,
         window.innerWidth/window.innerHeight,
         0.1,
         1000);
     renderer = new THREE.WebGLRenderer();
     renderer.setSize(window.innerWidth, window.innerHeight);
-    
+    clock = new THREE.Clock();
+    clock.start();
+
     document.body.appendChild(renderer.domElement);
     document.addEventListener('mousedown', e => onPress(e.clientX, e.clientY), false);
     document.addEventListener('mouseup', e => onRelease(e.clientX, e.clientY), false);
@@ -29,15 +38,21 @@ function init() {
     document.addEventListener('touchstart', e => onPress(e.touches[0].clientX, e.touches[0].clientY), false);
     document.addEventListener('touchend', e => onRelease(e.touches[0].clientX, e.touches[0].clientY), false);
     document.addEventListener('touchmove', e => {
-        e.preventDefault(); // Prevent scroll
-        onMove(e.touches[0].clientX, e.touches[0].clientY);}, false);
+        if (mousedown) {
+            e.preventDefault(); // Prevent scroll
+        }
+        onMove(e.touches[0].clientX, e.touches[0].clientY);
+    }, { passive: false });
 
     window.addEventListener('resize', onWindowResize, false);
 
-    const geometry = new THREE.BoxGeometry();
+    shapeZPivot = new THREE.Object3D();
+    scene.add(shapeZPivot);
+
+    const geometry = new THREE.IcosahedronGeometry(shapeRadius);
     const material = new THREE.MeshNormalMaterial();
-    cube = new THREE.Mesh(geometry, material);
-    scene.add(cube);
+    shape = new THREE.Mesh(geometry, material);
+    shapeZPivot.add(shape);
 
     camera.position.z = 5;
 
@@ -48,17 +63,33 @@ function animate() {
 
     requestAnimationFrame(animate);
 
-    // if (mousedown) {
-    //     cube.rotation.x += 0.01;
-    //     cube.rotation.y += 0.01;
-    // }
+    const rotationZ = shapeFloatRotationAmplitude * Math.cos((clock.getElapsedTime() - shapeFloatRotationOffset) * Math.PI * 2 / shapeFloatPeriod);
+    shapeZPivot.rotation.z = rotationZ;
+
+    const floatY = shapeFloatAmplitude * Math.cos(clock.getElapsedTime() * Math.PI * 2 / shapeFloatPeriod);
+    shapeZPivot.position.copy(shapePosition.add(new THREE.Vector3(0, floatY, 0)));
 
     renderer.render(scene, camera);
 }
 
 function onPress(x, y) {
 
-    mousedown = true;
+    mousepos = new THREE.Vector2(x, y);
+
+    scenemousepos = new THREE.Vector2(
+        (x / window.innerWidth) * 2 - 1,
+        (y / window.innerHeight) * -2 + 1
+    );
+    raycaster.setFromCamera(scenemousepos, camera);
+    const planeZ = new THREE.Plane(new THREE.Vector3(0, 0, 1), 0);
+    const intersection = new THREE.Vector3();
+    raycaster.ray.intersectPlane(planeZ, intersection);
+
+    if (intersection) {
+        if (shapePosition.distanceTo(intersection) <= shapeRadius) {
+            mousedown = true;
+        }
+    }
 }
 
 function onRelease(x, y) {
@@ -69,12 +100,14 @@ function onRelease(x, y) {
 function onMove(x, y) {
 
     if (mousedown) {
-        cube.rotation.y += rotationMultiplier * (x - lastX);
-        cube.rotation.x = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, cube.rotation.x + rotationMultiplier * (y - lastY)));
+        const dx = (x - mousepos.x);
+        const dy = (y - mousepos.y);
+        const q = new THREE.Quaternion();
+        q.setFromAxisAngle(new THREE.Vector3(dy, dx, 0).normalize(), rotationMultiplier * new THREE.Vector2(dx, dy).length());
+        shape.quaternion.premultiply(q);
     }
 
-    lastX = x;
-    lastY = y;
+    mousepos = new THREE.Vector2(x, y);
 }
 
 function onWindowResize() {
