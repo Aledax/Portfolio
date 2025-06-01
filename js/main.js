@@ -167,6 +167,10 @@ function init() {
     });
     shapeBack = new THREE.Mesh(geometry, shapeBackMaterial);
     shapeFront = new THREE.Mesh(geometry, shapeFrontMaterial);
+    const initialQuaternion = new THREE.Quaternion();
+    initialQuaternion.setFromAxisAngle(new THREE.Vector3(1, 0, 0), -59 * Math.PI / 180);
+    shapeBack.quaternion.premultiply(initialQuaternion);
+    shapeFront.quaternion.premultiply(initialQuaternion);
     shapeZPivot.add(shapeBack);
     shapeZPivot.add(shapeFront);
 
