@@ -28,7 +28,9 @@ function init() {
     document.addEventListener('mousemove', e => onMove(e.clientX, e.clientY), false);
     document.addEventListener('touchstart', e => onPress(e.touches[0].clientX, e.touches[0].clientY), false);
     document.addEventListener('touchend', e => onRelease(e.touches[0].clientX, e.touches[0].clientY), false);
-    document.addEventListener('touchmove', e => onMove(e.touches[0].clientX, e.touches[0].clientY), false);
+    document.addEventListener('touchmove', e => {
+        e.preventDefault(); // Prevent scroll
+        onMove(e.touches[0].clientX, e.touches[0].clientY);}, false);
 
     window.addEventListener('resize', onWindowResize, false);
 
