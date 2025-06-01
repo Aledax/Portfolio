@@ -8,6 +8,7 @@ const rotationMultiplier = 0.005;
 const rotationAcceleration = 0.5;
 const rotationFixedDeceleration = 0.75;
 const rotationFreeDeceleration = 0.95;
+const backgroundScrollMultiplier = 2;
 const shapePosition = new THREE.Vector3(0, 0, 0);
 const shapeRadius = 1;
 const shapeFloatAmplitude = 0.0025;
@@ -90,6 +91,7 @@ var mousedown = false;
 var mousepos = new THREE.Vector2();
 var mousevelocity = new THREE.Vector2();
 var scenemousepos = new THREE.Vector2();
+var backgroundscrollpos = new THREE.Vector2(0, 0);
 var raycaster = new THREE.Raycaster();
 
 init();
@@ -208,6 +210,9 @@ function animate() {
     rotateShape();
 
     renderer.render(scene, camera);
+
+    backgroundscrollpos.add(new THREE.Vector2(mousevelocity.x * backgroundScrollMultiplier, mousevelocity.y * backgroundScrollMultiplier));
+    document.body.style.backgroundPosition = `${backgroundscrollpos.x}px ${backgroundscrollpos.y}px`;
 }
 
 function onPress(x, y) {
