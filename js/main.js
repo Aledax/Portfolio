@@ -2,7 +2,7 @@ import * as THREE from 'https://unpkg.com/three@0.160.0/build/three.module.js';
 import { createDodecahedronGeometry } from './dodecahedron.js';
 
 var scene, camera, renderer, clock;
-var shapeZPivot, shapeBack, shapeFront;
+var glowMesh, shapeZPivot, shapeBack, shapeFront;
 
 const rotationMultiplier = 0.005;
 const rotationAcceleration = 0.5;
@@ -70,9 +70,9 @@ const shapeFrontFragmentShader = `
         float edgeCloseness = vBarycentric.y;
         float alpha = 0.0;
         float opaqueAlpha = 1.0;
-        float transparentAlpha = 0.2;
-        float opaqueBarrier = 0.04;
-        float transparentBarrier = 0.06;
+        float transparentAlpha = 0.15;
+        float opaqueBarrier = 0.05;
+        float transparentBarrier = 0.07;
         if (edgeCloseness < opaqueBarrier) {
             alpha = opaqueAlpha;
         } else if (edgeCloseness < transparentBarrier) {
@@ -80,7 +80,7 @@ const shapeFrontFragmentShader = `
         } else {
             alpha = transparentAlpha;
         }
-        gl_FragColor = vec4((vec3(0.0, 0.7, 1.0) + lightFactor) * darkFactor, alpha);
+        gl_FragColor = vec4((vec3(0.0, (0.6 + lightFactor / 1.5) * (darkFactor + ((1.0 - darkFactor) / 1.5)), 1.0) + lightFactor) * darkFactor, alpha);
     }
 `
 
@@ -128,6 +128,19 @@ function init() {
     }, { passive: false });
 
     window.addEventListener('resize', onWindowResize, false);
+
+    const textureLoader = new THREE.TextureLoader();
+    const glowTexture = textureLoader.load('../assets/images/glow.png');
+    const glowMaterial = new THREE.MeshBasicMaterial({
+        map: glowTexture,
+        transparent: true,
+        opacity: 0.5,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending
+    });
+    const glowGeometry = new THREE.PlaneGeometry(2.5, 2.5);
+    glowMesh = new THREE.Mesh(glowGeometry, glowMaterial);
+    scene.add(glowMesh);
 
     shapeZPivot = new THREE.Object3D();
     scene.add(shapeZPivot);
@@ -178,6 +191,8 @@ function animate() {
 
     const floatY = shapeFloatAmplitude * Math.cos(clock.getElapsedTime() * Math.PI * 2 / shapeFloatPeriod);
     shapeZPivot.position.copy(shapePosition.add(new THREE.Vector3(0, floatY, 0)));
+
+    glowMesh.position.copy(shapeZPivot.position);
 
     if (mousedown) {
         mousevelocity.multiplyScalar(rotationFixedDeceleration);

@@ -78,8 +78,6 @@ for (let p = 0; p < 12; p++) {
     }
 }
 
-console.log(positions);
-
 export function createDodecahedronGeometry() {
 
     let geometry = new THREE.BufferGeometry();
