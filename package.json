@@ -1,5 +1,12 @@
 {
   "dependencies": {
-    "three": "^0.177.0"
+    "jimp": "^1.6.0",
+    "three": "^0.177.0",
+    "troika-three-text": "^0.52.4"
+  },
+  "devDependencies": {
+    "buffer": "^6.0.3",
+    "parcel": "^2.15.2",
+    "sharp": "^0.33.5"
   }
 }

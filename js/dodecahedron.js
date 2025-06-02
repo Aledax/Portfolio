@@ -1,4 +1,4 @@
-import * as THREE from 'https://unpkg.com/three@0.160.0/build/three.module.js';
+import * as THREE from 'three';
 
 const radius = 1;
 
@@ -70,7 +70,7 @@ for (let p = 0; p < 12; p++) {
 var positions = [];
 
 for (let p = 0; p < 12; p++) {
-    let pentagon = pentagons[p];
+    const pentagon = pentagons[p];
     for (let e = 0; e < 5; e++) {
         positions = positions.concat(vertices[pentagon[e]]);
         positions = positions.concat(faceCenters[p]);
