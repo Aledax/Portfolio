@@ -1,10 +1,7 @@
-import * as THREE from 'three';
-import { EffectComposer } from 'three/examples/jsm/Addons.js';
-import { RenderPass } from 'three/examples/jsm/Addons.js';
-import { SSAARenderPass } from 'three/examples/jsm/Addons.js';
+import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.152.2/build/three.module.js';
 import { createDodecahedronGeometry } from './dodecahedron.js';
 
-var scene, camera, renderer, composer, aaPass, clock;
+var scene, camera, renderer, clock;
 var glowMesh, dodecahedronGeometry, shapeZPivot, shapeBack, shapeFront;
 
 var normalArrows = [];
@@ -18,7 +15,7 @@ const rotationFacingAcceleration = 5;
 const rotationFixedDeceleration = 0.75;
 const rotationFreeDeceleration = 0.95;
 const rotationFacingDeceleration = 0.85;
-const faceMaximumSpeed = 7;
+const faceMaximumSpeed = 5;
 const backgroundScrollMultiplier = -1;
 const shapePosition = new THREE.Vector3(0, 0, 0);
 const shapeRadius = 1;
@@ -130,11 +127,6 @@ function init() {
     });
     renderer.setSize(window.innerWidth, window.innerHeight);
     renderer.setClearColor(0x000000, 0);
-    composer = new EffectComposer(renderer);
-    composer.addPass(new RenderPass(scene, camera));
-    aaPass = new SSAARenderPass(scene, camera);
-    aaPass.sampleLevel = 2;
-    composer.addPass(aaPass);
 
     clock = new THREE.Clock();
     clock.start();
@@ -348,7 +340,7 @@ function animate() {
     }
     rotateShape();
 
-    composer.render(scene, camera);
+    renderer.render(scene, camera);
 
     backgroundscrollpos.add(new THREE.Vector2(mousevelocity.x * backgroundScrollMultiplier, mousevelocity.y * backgroundScrollMultiplier));
     document.body.style.backgroundPosition = `${backgroundscrollpos.x}px ${backgroundscrollpos.y}px`;
@@ -394,5 +386,4 @@ function onWindowResize() {
     camera.updateProjectionMatrix();
 
     renderer.setSize(window.innerWidth, window.innerHeight);
-    composer.setSize(window.innerWidth, window.innerHeight);
 }
