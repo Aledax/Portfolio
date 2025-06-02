@@ -5,9 +5,10 @@ var scene, camera, renderer, clock;
 var glowMesh, dodecahedronGeometry, shapeZPivot, shapeBack, shapeFront;
 
 var normalArrows = [];
-var unactivatedIconMeshes = [];
+var iconPlaceholders = [];
 var activatedIconMeshes = [];
 var iconGlowMeshes = [];
+var iconFlashMeshes = [];
 
 const rotationMultiplier = 0.005;
 const rotationAcceleration = 0.5;
@@ -15,7 +16,7 @@ const rotationFacingAcceleration = 5;
 const rotationFixedDeceleration = 0.75;
 const rotationFreeDeceleration = 0.95;
 const rotationFacingDeceleration = 0.85;
-const faceMaximumSpeed = 5;
+const faceMaximumSpeed = 7;
 const backgroundScrollMultiplier = -1;
 const shapePosition = new THREE.Vector3(0, 0, 0);
 const shapeRadius = 1;
@@ -54,10 +55,10 @@ const shapeBackFragmentShader = `
         float lighting = -vNormal.y * 0.25 + 0.75;
         float edgeCloseness = vBarycentric.y;
         float alpha = 0.0;
-        float opaqueAlpha = 0.4;
+        float opaqueAlpha = 0.2;
         float transparentAlpha = 0.0;
-        float opaqueBarrier = 0.01;
-        float transparentBarrier = 0.02;
+        float opaqueBarrier = 0.02;
+        float transparentBarrier = 0.03;
         if (edgeCloseness < opaqueBarrier) {
             alpha = opaqueAlpha;
         } else if (edgeCloseness < transparentBarrier) {
@@ -90,7 +91,7 @@ const shapeFrontFragmentShader = `
         float edgeCloseness = vBarycentric.y;
         float alpha = 0.0;
         float opaqueAlpha = 1.0;
-        float transparentAlpha = 0.15;
+        float transparentAlpha = 0.1;
         float opaqueBarrier = 0.05;
         float transparentBarrier = 0.07;
         if (edgeCloseness < opaqueBarrier) {
@@ -104,12 +105,13 @@ const shapeFrontFragmentShader = `
     }
 `
 
-var mousedown = false;
-var mousepos = new THREE.Vector2();
-var mousevelocity = new THREE.Vector2();
-var scenemousepos = new THREE.Vector2();
-var backgroundscrollpos = new THREE.Vector2(0, 0);
+var mouseDown = false;
+var mousePos = new THREE.Vector2();
+var mouseVelocity = new THREE.Vector2();
+var screenMousePos = new THREE.Vector2();
+var backgroundScrollPos = new THREE.Vector2(0, 0);
 var raycaster = new THREE.Raycaster();
+var focusedFace = -1;
 
 init();
 
@@ -137,13 +139,13 @@ function init() {
     document.addEventListener('mousemove', e => onMove(e.clientX, e.clientY), false);
     document.addEventListener('touchstart', e => onPress(e.touches[0].clientX, e.touches[0].clientY), false);
     document.addEventListener('touchend', e => {
-        if (mousedown) {
+        if (mouseDown) {
             e.preventDefault();
         }
         onRelease(e.touches[0].clientX, e.touches[0].clientY);
     }, { passive: false });
     document.addEventListener('touchmove', e => {
-        if (mousedown) {
+        if (mouseDown) {
             e.preventDefault();
         }
         onMove(e.touches[0].clientX, e.touches[0].clientY);
@@ -168,30 +170,14 @@ function init() {
     glowMesh = new THREE.Mesh(glowGeometry, glowMaterial);
     scene.add(glowMesh);
 
-    const unactivatedIconURL = new URL(
-        '../assets/images/icons/unactivated/sampleicon.png?as=webp',
-        import.meta.url
-    );
     const activatedIconURL = new URL(
         '../assets/images/icons/activated/sampleicon.png?as=webp',
         import.meta.url
     );
-    const unactivatedIconTexture = textureLoader.load(unactivatedIconURL, texture => {
-        texture.minFilter = THREE.NearestFilter;
-        texture.magFilter = THREE.NearestFilter;
-        texture.generateMipmaps = false;
-    });
     const activatedIconTexture = textureLoader.load(activatedIconURL, texture => {
         texture.minFilter = THREE.NearestFilter;
         texture.magFilter = THREE.NearestFilter;
         texture.generateMipmaps = false;
-    });
-    const unactivatedIconMaterial = new THREE.MeshBasicMaterial({
-        map: unactivatedIconTexture,
-        transparent: false,
-        opacity: 0.05,
-        depthWrite: false,
-        blending: THREE.AdditiveBlending
     });
     const activatedIconMaterial = new THREE.MeshBasicMaterial({
         map: activatedIconTexture,
@@ -202,13 +188,17 @@ function init() {
     });
     const iconGeometry = new THREE.PlaneGeometry(0.5, 0.5);
     const iconGlowGeometry = new THREE.PlaneGeometry(1, 1);
+    const iconFlashGeometry = new THREE.PlaneGeometry(1.5, 1.5);
     for (let i = 0; i < 12; i++) {
-        const unactivatedIconMesh = new THREE.Mesh(iconGeometry, unactivatedIconMaterial);
+        const iconPlaceholder = new THREE.Object3D();
         const activatedIconMesh = new THREE.Mesh(iconGeometry, activatedIconMaterial.clone());
         const iconGlowMesh = new THREE.Mesh(iconGlowGeometry, glowMaterial.clone());
-        unactivatedIconMeshes.push(unactivatedIconMesh);
+        const iconFlashMesh = new THREE.Mesh(iconFlashGeometry, glowMaterial.clone());
+        iconPlaceholders.push(iconPlaceholder);
         activatedIconMeshes.push(activatedIconMesh);
         iconGlowMeshes.push(iconGlowMesh);
+        iconFlashMesh.material.opacity = 0;
+        iconFlashMeshes.push(iconFlashMesh);
     }
 
     shapeZPivot = new THREE.Object3D();
@@ -244,15 +234,12 @@ function init() {
             shapeNormals[i*45+1],
             shapeNormals[i*45+2]
         ).normalize();
-        shapeFront.add(unactivatedIconMeshes[i]);
-        shapeFront.add(activatedIconMeshes[i]);
-        shapeFront.add(iconGlowMeshes[i]);
-        unactivatedIconMeshes[i].position.copy(normal.clone().multiplyScalar(0.8));
-        unactivatedIconMeshes[i].lookAt(normal.clone().multiplyScalar(2));
-        activatedIconMeshes[i].position.copy(normal.clone().multiplyScalar(0.8));
-        activatedIconMeshes[i].lookAt(normal.clone().multiplyScalar(2));
-        iconGlowMeshes[i].position.copy(normal.clone().multiplyScalar(0.8));
-        iconGlowMeshes[i].lookAt(normal.clone().multiplyScalar(2));
+        shapeFront.add(iconPlaceholders[i]);
+        iconPlaceholders[i].add(activatedIconMeshes[i]);
+        iconPlaceholders[i].add(iconGlowMeshes[i]);
+        iconPlaceholders[i].add(iconFlashMeshes[i]);
+        iconPlaceholders[i].position.copy(normal.clone().multiplyScalar(0.8));
+        iconPlaceholders[i].lookAt(normal.clone().multiplyScalar(2));
     }
     
     const initialQuaternion = new THREE.Quaternion();
@@ -279,7 +266,7 @@ function init() {
 
 function rotateShape() {
     const q = new THREE.Quaternion();
-    q.setFromAxisAngle(new THREE.Vector3(mousevelocity.y, mousevelocity.x, 0).normalize(), rotationMultiplier * mousevelocity.length());
+    q.setFromAxisAngle(new THREE.Vector3(mouseVelocity.y, mouseVelocity.x, 0).normalize(), rotationMultiplier * mouseVelocity.length());
     shapeBack.quaternion.premultiply(q);
     shapeFront.quaternion.premultiply(q);
 }
@@ -302,82 +289,102 @@ function animate() {
     var highestDot = -1;
     var bestIndex = -1;
     var bestNormal = null;
+    var normals = [];
     for (let i = 0; i < 12; i++) {
         // console.log(dodecahedronGeometry.attributes.normal.array[i]);
         const normal = new THREE.Vector3(shapeNormals[i*45], shapeNormals[(i*45)+1], shapeNormals[(i*45)+2]).applyMatrix3(normalMatrix).normalize();
         const dot = normal.dot(faceDirection);
-        normalArrows[i].setDirection(normal);
-        normalArrows[i].setColor(0xff0000);
-        if (dot >= shapeFaceRequiredDot && dot > highestDot) {
+        // normalArrows[i].setDirection(normal);
+        // normalArrows[i].setColor(0xff0000);
+        if (dot > highestDot) {
             highestDot = dot;
             bestIndex = i;
             bestNormal = normal;
         }
-    }
-    if (bestIndex != -1) {
-        normalArrows[bestIndex].setColor(0x00ff00);
-    }
-    for (let i = 0; i < 12; i++) {
-        if (bestIndex == i && (mousedown || mousevelocity.length() <= faceMaximumSpeed)) {
-            activatedIconMeshes[i].material.opacity += 0.4 * (1.0 - activatedIconMeshes[i].material.opacity);
-            iconGlowMeshes[i].material.opacity += 0.4 * (1.0 - iconGlowMeshes[i].material.opacity);
-        } else {
-            activatedIconMeshes[i].material.opacity *= 0.8;
-            iconGlowMeshes[i].material.opacity *= 0.8;
-        }
+        normals.push(normal);
     }
 
-    if (mousedown) {
-        mousevelocity.multiplyScalar(rotationFixedDeceleration);
-    } else {
-        if (mousevelocity.length() <= faceMaximumSpeed && bestIndex != -1) {
-            const resolveDirection = new THREE.Vector2(-bestNormal.x, bestNormal.y);
-            mousevelocity.add(resolveDirection.multiplyScalar(rotationFacingAcceleration));
-            mousevelocity.multiplyScalar(rotationFacingDeceleration);
+    if (!mouseDown && focusedFace == -1 && bestIndex != -1 && highestDot >= shapeFaceRequiredDot && mouseVelocity.length() <= faceMaximumSpeed) {
+        focusedFace = bestIndex;
+        activatedIconMeshes[focusedFace].material.opacity = 1;
+        iconGlowMeshes[focusedFace].material.opacity = 1;
+        iconFlashMeshes[focusedFace].material.opacity = 1;
+        // normalArrows[bestIndex].setColor(0x00ff00);
+    }
+
+    if (focusedFace != -1 && (focusedFace != bestIndex || bestNormal <= shapeFaceRequiredDot)) {
+        focusedFace = -1;
+    }
+    
+    for (let i = 0; i < 12; i++) {
+        if (i == focusedFace) {
+            activatedIconMeshes[i].material.opacity += 0.4 * (0.9 - activatedIconMeshes[i].material.opacity);
+            iconGlowMeshes[i].material.opacity += 0.4 * (0.9 - iconGlowMeshes[i].material.opacity);
+            const localX = new THREE.Vector3(1, 0, 0);
+            const worldX = localX.clone().applyQuaternion(activatedIconMeshes[i].getWorldQuaternion(new THREE.Quaternion()));
+            const currentAngle = Math.atan2(worldX.y, worldX.x);
+            const spinQuaternion = new THREE.Quaternion();
+            spinQuaternion.setFromAxisAngle(new THREE.Vector3(0, 0, 1), -currentAngle * 0.1);
+            activatedIconMeshes[i].quaternion.premultiply(spinQuaternion);
         } else {
-            mousevelocity.multiplyScalar(rotationFreeDeceleration);
+            const brightness = Math.pow(Math.max(0, normals[i].dot(faceDirection)), 7) * 0.5;
+            activatedIconMeshes[i].material.opacity += 0.4 * (brightness - activatedIconMeshes[i].material.opacity);
+            iconGlowMeshes[i].material.opacity += 0.4 * (brightness - iconGlowMeshes[i].material.opacity);
+        }
+        iconFlashMeshes[i].material.opacity *= 0.9;
+    }
+
+    if (mouseDown) {
+        mouseVelocity.multiplyScalar(rotationFixedDeceleration);
+    } else {
+        if (focusedFace != -1) {
+            const resolveDirection = new THREE.Vector2(-bestNormal.x, bestNormal.y);
+            mouseVelocity.add(resolveDirection.multiplyScalar(rotationFacingAcceleration));
+            mouseVelocity.multiplyScalar(rotationFacingDeceleration);
+        } else {
+            mouseVelocity.multiplyScalar(rotationFreeDeceleration);
         }
     }
     rotateShape();
 
     renderer.render(scene, camera);
 
-    backgroundscrollpos.add(new THREE.Vector2(mousevelocity.x * backgroundScrollMultiplier, mousevelocity.y * backgroundScrollMultiplier));
-    document.body.style.backgroundPosition = `${backgroundscrollpos.x}px ${backgroundscrollpos.y}px`;
+    backgroundScrollPos.add(new THREE.Vector2(mouseVelocity.x * backgroundScrollMultiplier, mouseVelocity.y * backgroundScrollMultiplier));
+    document.body.style.backgroundPosition = `${backgroundScrollPos.x}px ${backgroundScrollPos.y}px`;
 }
 
 function onPress(x, y) {
 
-    mousepos = new THREE.Vector2(x, y);
+    mousePos = new THREE.Vector2(x, y);
 
-    scenemousepos = new THREE.Vector2(
+    screenMousePos = new THREE.Vector2(
         (x / window.innerWidth) * 2 - 1,
         (y / window.innerHeight) * -2 + 1
     );
-    raycaster.setFromCamera(scenemousepos, camera);
+    raycaster.setFromCamera(screenMousePos, camera);
     const planeZ = new THREE.Plane(new THREE.Vector3(0, 0, 1), 0);
     const intersection = new THREE.Vector3();
     raycaster.ray.intersectPlane(planeZ, intersection);
 
     if (intersection) {
         if (shapePosition.distanceTo(intersection) <= shapeRadius) {
-            mousedown = true;
+            mouseDown = true;
         }
     }
 }
 
 function onRelease(x, y) {
 
-    mousedown = false;
+    mouseDown = false;
 }
 
 function onMove(x, y) {
 
-    if (mousedown) {
-        mousevelocity.add(new THREE.Vector2(x - mousepos.x, y - mousepos.y).multiplyScalar(rotationAcceleration));
+    if (mouseDown) {
+        mouseVelocity.add(new THREE.Vector2(x - mousePos.x, y - mousePos.y).multiplyScalar(rotationAcceleration));
     }
 
-    mousepos = new THREE.Vector2(x, y);
+    mousePos = new THREE.Vector2(x, y);
 }
 
 function onWindowResize() {
