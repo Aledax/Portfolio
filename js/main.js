@@ -137,12 +137,15 @@ function init() {
     document.addEventListener('mousedown', e => onPress(e.clientX, e.clientY), false);
     document.addEventListener('mouseup', e => onRelease(e.clientX, e.clientY), false);
     document.addEventListener('mousemove', e => onMove(e.clientX, e.clientY), false);
-    document.addEventListener('touchstart', e => onPress(e.touches[0].clientX, e.touches[0].clientY), false);
+    document.addEventListener('touchstart', e => {
+        e.preventDefault();
+        onPress(e.touches[0].clientX, e.touches[0].clientY);
+    }, { passive: false });
     document.addEventListener('touchend', e => {
         if (mouseDown) {
             e.preventDefault();
         }
-        onRelease(e.touches[0].clientX, e.touches[0].clientY);
+        onRelease();
     }, { passive: false });
     document.addEventListener('touchmove', e => {
         if (mouseDown) {
@@ -264,6 +267,10 @@ function init() {
     animate();
 }
 
+function checkShapeIntersection() {
+
+}
+
 function rotateShape() {
     const q = new THREE.Quaternion();
     q.setFromAxisAngle(new THREE.Vector3(mouseVelocity.y, mouseVelocity.x, 0).normalize(), rotationMultiplier * mouseVelocity.length());
@@ -373,7 +380,7 @@ function onPress(x, y) {
     }
 }
 
-function onRelease(x, y) {
+function onRelease() {
 
     mouseDown = false;
 }
