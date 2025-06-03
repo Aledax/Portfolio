@@ -1,5 +1,7 @@
-import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.152.2/build/three.module.js';
+import * as THREE from 'https://esm.sh/three@0.160.1';
+import { Text } from 'https://esm.sh/troika-three-text@0.48.0?deps=three@0.160.1';
 import { createDodecahedronGeometry } from './dodecahedron.js';
+import { projectData } from './projectdata.js';
 
 var scene, camera, renderer, clock;
 var glowMesh, dodecahedronGeometry, shapeZPivot, shapeBack, shapeFront;
@@ -9,6 +11,8 @@ var iconPlaceholders = [];
 var activatedIconMeshes = [];
 var iconGlowMeshes = [];
 var iconFlashMeshes = [];
+var projectNameTexts = [];
+var projectNamePlaceholders = [];
 
 const rotationMultiplier = 0.005;
 const rotationAcceleration = 0.5;
@@ -112,6 +116,11 @@ var screenMousePos = new THREE.Vector2();
 var backgroundScrollPos = new THREE.Vector2(0, 0);
 var raycaster = new THREE.Raycaster();
 var focusedFace = -1;
+var focusedTime = 0;
+
+function syncTextPromise(text) {
+    return new Promise(resolve => text.sync(() => resolve()));
+}
 
 init();
 
@@ -262,13 +271,64 @@ function init() {
         // scene.add(normalArrows[i]);
     };
 
+    for (let i = 0; i < 12; i++) {
+        const pData = projectData[i];
+        const letterTexts = [];
+        const letterPlaceholders = [];
+
+        for (let letter = 0; letter < pData.name.length; letter++) {
+            const text = new Text();
+            text.font = '../assets/fonts/manrope-extrabold.otf';
+            text.text = pData.name[letter];
+            text.fontSize = 0.45;
+            text.color = 0xffffff;
+            text.material.transparent = true;
+            text.material.opacity = 1;
+            if (text.text == ' ') {
+                text.text = 'l';
+                text.material.opacity = 0;
+            }
+            letterTexts.push(text);
+
+            const placeholder = new THREE.Object3D();
+            placeholder.add(text);
+            scene.add(placeholder);
+            letterPlaceholders.push(placeholder);
+        }
+
+        Promise.all(letterTexts.map(syncTextPromise)).then(() => {
+            const kerning = 0.0;
+            let totalWidth = 0.0;
+            const letterWidths = [];
+            for (let letter = 0; letter < letterTexts.length; letter++) {
+                letterTexts[letter].geometry.computeBoundingBox();
+                const bbox = letterTexts[letter].geometry.boundingBox;
+                const size = new THREE.Vector3();
+                bbox.getSize(size);
+                totalWidth += size.x;
+                if (letter != 0) {
+                    totalWidth += kerning;
+                }
+                letterWidths.push(size.x)
+            }
+
+            let incrementalWidth = 0;
+            for (let letter = 0; letter < letterTexts.length; letter++) {
+                const letterCenter = new THREE.Vector3(-totalWidth / 2 + incrementalWidth + letterWidths[letter] / 2, 1.5, 0);
+                const letterTopLeft = new THREE.Vector3(-letterWidths[letter] / 2, 0.45, 0);
+                letterPlaceholders[letter].position.copy(letterCenter);
+                letterTexts[letter].position.copy(letterTopLeft);
+                incrementalWidth += letterWidths[letter] + kerning;
+            }
+        });
+
+        projectNameTexts.push(letterTexts);
+        projectNamePlaceholders.push(letterPlaceholders);
+    }
+
     camera.position.z = 5;
 
     animate();
-}
-
-function checkShapeIntersection() {
-
 }
 
 function rotateShape() {
@@ -281,6 +341,11 @@ function rotateShape() {
 function animate() {
 
     requestAnimationFrame(animate);
+    const elapsed = clock.getDelta();
+
+    if (focusedFace != -1) {
+        focusedTime += elapsed;
+    }
 
     const rotationZ = shapeFloatRotationAmplitude * Math.cos((clock.getElapsedTime() - shapeFloatRotationOffset) * Math.PI * 2 / shapeFloatPeriod);
     shapeZPivot.rotation.z = rotationZ;
@@ -313,6 +378,7 @@ function animate() {
 
     if (!mouseDown && focusedFace == -1 && bestIndex != -1 && highestDot >= shapeFaceRequiredDot && mouseVelocity.length() <= faceMaximumSpeed) {
         focusedFace = bestIndex;
+        focusedTime = 0;
         activatedIconMeshes[focusedFace].material.opacity = 1;
         iconGlowMeshes[focusedFace].material.opacity = 1;
         iconFlashMeshes[focusedFace].material.opacity = 1;
@@ -321,6 +387,22 @@ function animate() {
 
     if (focusedFace != -1 && (focusedFace != bestIndex || bestNormal <= shapeFaceRequiredDot)) {
         focusedFace = -1;
+    }
+
+    for (let i = 0; i < 12; i++) {
+        for (let letter = 0; letter < projectNamePlaceholders[i].length; letter++) {
+            const show = (i == focusedFace && focusedTime >= letter * 0.025);
+            
+            const targetScale = show ? 1 : 0;
+            const currentScale = projectNamePlaceholders[i][letter].scale.x;
+            const newScale = currentScale + 0.2 * (targetScale - currentScale);
+            projectNamePlaceholders[i][letter].scale.set(newScale, newScale, 1);
+        
+            const targetRotation = show ? 0 : 0.4;
+            const currentRotation = projectNamePlaceholders[i][letter].rotation.z;
+            const newRotation = currentRotation + 0.4 * (targetRotation - currentRotation);
+            projectNamePlaceholders[i][letter].rotation.z = newRotation;
+        }
     }
     
     for (let i = 0; i < 12; i++) {

@@ -16,8 +16,8 @@ async function processImage(rawPath, unactivatedPath, activatedPath) {
             const b = this.bitmap.data[idx + 2];
 
             if (r === 0 && g === 0 && b === 0) {
-                this.bitmap.data[idx + 0] = 100;
-                this.bitmap.data[idx + 1] = 200;
+                this.bitmap.data[idx + 0] = 200;
+                this.bitmap.data[idx + 1] = 225;
                 this.bitmap.data[idx + 2] = 255;
             }
         });
