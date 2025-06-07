@@ -13,6 +13,7 @@ var iconGlowMeshes = [];
 var iconFlashMeshes = [];
 var projectNameTexts = [];
 var projectNamePlaceholders = [];
+var projcetNamePlaceholderPositions = [];
 
 const rotationMultiplier = 0.005;
 const rotationAcceleration = 0.5;
@@ -24,19 +25,25 @@ const faceMaximumSpeed = 7;
 const backgroundScrollMultiplier = -1;
 const shapePosition = new THREE.Vector3(0, 0, 0);
 const shapeRadius = 1;
-const shapeFloatAmplitude = 0.0025;
+const shapeFloatAmplitude = 0.1;
 const shapeFloatPeriod = 5;
 const shapeFloatRotationAmplitude = 0.05;
-const shapeFloatRotationOffset = shapeFloatPeriod / 2;
+const shapeFloatRotationOffset = shapeFloatPeriod * 0.25;
 const shapeFaceRequiredDot = 0.91;
 
-// const titleSize = 24;
-// const titleY = 2;
-// const titleKerning = 0.5;
-// const titleText = 'Alex Day';
-// const titleFont = 'js/dashhorizon.otf';
-// const titleColor = 0x00aaff;
-// const titleTextMeshes = [];
+const titleFont = '../assets/fonts/Sophiecomic-Regular.ttf';
+const titleSize = 0.6;
+const titleKerning = -0.01;
+const titleY = 1.6;
+const titleShrinkRotation = 1.2;
+const titleShrinkRotationLerp = 0.2;
+const titleShrinkLerp = 0.2;
+const titleShrinkInterval = 0.03;
+const titleFloatPeriod = 4.1;
+const titleFloatRotationAmplitude = 0.05;
+const titleFloatRotationPhaseOffset = titleFloatPeriod / 2;
+const titleFloatAmplitude = 0.01;
+const titleFloatLetterPhaseOffset = 2;
 
 const shapeVertexShader = `
     attribute vec3 barycentric;
@@ -117,6 +124,7 @@ var backgroundScrollPos = new THREE.Vector2(0, 0);
 var raycaster = new THREE.Raycaster();
 var focusedFace = -1;
 var focusedTime = 0;
+var titleReadyCounter = 0;
 
 function syncTextPromise(text) {
     return new Promise(resolve => text.sync(() => resolve()));
@@ -275,12 +283,13 @@ function init() {
         const pData = projectData[i];
         const letterTexts = [];
         const letterPlaceholders = [];
+        projcetNamePlaceholderPositions.push([]);
 
         for (let letter = 0; letter < pData.name.length; letter++) {
             const text = new Text();
-            text.font = '../assets/fonts/manrope-extrabold.otf';
+            text.font = titleFont;
             text.text = pData.name[letter];
-            text.fontSize = 0.45;
+            text.fontSize = titleSize;
             text.color = 0xffffff;
             text.material.transparent = true;
             text.material.opacity = 1;
@@ -297,7 +306,7 @@ function init() {
         }
 
         Promise.all(letterTexts.map(syncTextPromise)).then(() => {
-            const kerning = 0.0;
+            const kerning = titleKerning;
             let totalWidth = 0.0;
             const letterWidths = [];
             for (let letter = 0; letter < letterTexts.length; letter++) {
@@ -314,12 +323,14 @@ function init() {
 
             let incrementalWidth = 0;
             for (let letter = 0; letter < letterTexts.length; letter++) {
-                const letterCenter = new THREE.Vector3(-totalWidth / 2 + incrementalWidth + letterWidths[letter] / 2, 1.5, 0);
-                const letterTopLeft = new THREE.Vector3(-letterWidths[letter] / 2, 0.45, 0);
-                letterPlaceholders[letter].position.copy(letterCenter);
+                const letterCenter = new THREE.Vector3(-totalWidth / 2 + incrementalWidth + letterWidths[letter] / 2, titleY, 0);
+                const letterTopLeft = new THREE.Vector3(-letterWidths[letter] / 2, titleSize / 2, 0);
+                // letterPlaceholders[letter].position.copy(letterCenter);
                 letterTexts[letter].position.copy(letterTopLeft);
                 incrementalWidth += letterWidths[letter] + kerning;
+                projcetNamePlaceholderPositions[i].push(letterCenter);
             }
+            titleReadyCounter += 1;
         });
 
         projectNameTexts.push(letterTexts);
@@ -347,11 +358,11 @@ function animate() {
         focusedTime += elapsed;
     }
 
-    const rotationZ = shapeFloatRotationAmplitude * Math.cos((clock.getElapsedTime() - shapeFloatRotationOffset) * Math.PI * 2 / shapeFloatPeriod);
+    const rotationZ = shapeFloatRotationAmplitude * Math.cos(clock.getElapsedTime() * Math.PI * 2 / shapeFloatPeriod - shapeFloatRotationOffset);
     shapeZPivot.rotation.z = rotationZ;
 
     const floatY = shapeFloatAmplitude * Math.cos(clock.getElapsedTime() * Math.PI * 2 / shapeFloatPeriod);
-    shapeZPivot.position.copy(shapePosition.add(new THREE.Vector3(0, floatY, 0)));
+    shapeZPivot.position.copy(shapePosition.clone().add(new THREE.Vector3(0, floatY, 0)));
 
     glowMesh.position.copy(shapeZPivot.position);
 
@@ -389,19 +400,28 @@ function animate() {
         focusedFace = -1;
     }
 
-    for (let i = 0; i < 12; i++) {
-        for (let letter = 0; letter < projectNamePlaceholders[i].length; letter++) {
-            const show = (i == focusedFace && focusedTime >= letter * 0.025);
+    if (titleReadyCounter == projectData.length) {
+        for (let i = 0; i < 12; i++) {
+            for (let letter = 0; letter < projectNamePlaceholders[i].length; letter++) {
+                const show = (i == focusedFace && focusedTime >= letter * titleShrinkInterval);
+
+                const targetScale = show ? 1 : 0;
+                const currentScale = projectNamePlaceholders[i][letter].scale.x;
+                const newScale = currentScale + titleShrinkLerp * (targetScale - currentScale);
+                projectNamePlaceholders[i][letter].scale.set(newScale, newScale, 1);
             
-            const targetScale = show ? 1 : 0;
-            const currentScale = projectNamePlaceholders[i][letter].scale.x;
-            const newScale = currentScale + 0.2 * (targetScale - currentScale);
-            projectNamePlaceholders[i][letter].scale.set(newScale, newScale, 1);
-        
-            const targetRotation = show ? 0 : 0.4;
-            const currentRotation = projectNamePlaceholders[i][letter].rotation.z;
-            const newRotation = currentRotation + 0.4 * (targetRotation - currentRotation);
-            projectNamePlaceholders[i][letter].rotation.z = newRotation;
+                const targetRotation = show ? 0 : titleShrinkRotation;
+                const currentRotation = projectNamePlaceholders[i][letter].rotation.z;
+                const newRotation = currentRotation + titleShrinkRotationLerp * (targetRotation - currentRotation);
+                projectNamePlaceholders[i][letter].rotation.z = newRotation;
+
+                if (show) {
+                    const newPosition = projcetNamePlaceholderPositions[i][letter].clone();
+                    newPosition.y = titleY + titleFloatAmplitude * Math.cos(clock.getElapsedTime() * Math.PI * 2 / titleFloatPeriod - titleFloatLetterPhaseOffset * letter);
+                    projectNamePlaceholders[i][letter].position.copy(newPosition);
+                    projectNamePlaceholders[i][letter].rotation.z = titleFloatRotationAmplitude * Math.cos(clock.getElapsedTime() * Math.PI * 2 / titleFloatPeriod - titleFloatRotationPhaseOffset - titleFloatLetterPhaseOffset * letter);
+                }
+            }
         }
     }
     
