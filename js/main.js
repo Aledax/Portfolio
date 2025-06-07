@@ -28,8 +28,7 @@ const shapeFocusRequiredDot = 0.92;
 const titleFont = '../assets/fonts/Sophiecomic-Regular.ttf';
 const titleSize = 0.55;
 const titleKerning = -0.01;
-const titleColor = 0xf0ffff;
-const titleHighlightColor = 0x00ffff;
+const titleColor = 0x77ffff;
 const titleOpacity = 0.95;
 const titleY = 1.75;
 const titleShrinkRotation = 1.2;
@@ -52,7 +51,7 @@ const bodyLineSpacing = 0.17;
 const bodyLineHeight = 0.2; // Approximate, should be about equal to the actual Y
 const bodyShrinkLerp = 0.2;
 const bodyFloatPeriod = 4.1;
-const bodyFloatRotationAmplitude = 0.03;
+const bodyFloatRotationAmplitude = 0.02;
 
 const buttonFont = '../assets/fonts/Sophiecomic-Regular.ttf';
 const buttonFontSize = 0.225;
@@ -291,7 +290,7 @@ function init() {
             text.font = titleFont;
             text.text = data.name[letter];
             text.fontSize = thisTitleSize;
-            text.color = letter == 0 || data.name[letter - 1] == ' ' ? titleHighlightColor : titleColor;
+            text.color = titleColor;
             text.material.transparent = true;
             text.material.opacity = titleOpacity;
             if (text.text == ' ') {
