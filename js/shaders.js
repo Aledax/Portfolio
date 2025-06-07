@@ -89,7 +89,7 @@ export const buttonFragmentShader = `
     void main() {
         vec2 pixelPos = v_uv * u_size;
 
-        float borderSmoothWidth = 0.015;
+        float borderSmoothWidth = 0.01;
 
         float left = pixelPos.x;
         float right = u_size.x - pixelPos.x;

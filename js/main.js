@@ -65,10 +65,10 @@ const buttonInterval = 1.2;
 const buttonShrinkLerp = 0.2;
 const buttonBorderWidth = 0.015;
 const buttonColors = {
-    'github': new THREE.Vector4(0, 0.75, 1, 1),
-    'play': new THREE.Vector4(1, 0, 0.9, 1),
-    'video': new THREE.Vector4(0, 1, 0.4, 1),
-    'radio': new THREE.Vector4(0.2, 0, 1, 1)
+    'github': new THREE.Vector4(0.2, 0.85, 1, 1),
+    'play': new THREE.Vector4(1, 0.2, 0.9, 1),
+    'video': new THREE.Vector4(0.2, 1, 0.4, 1),
+    'radio': new THREE.Vector4(0.4, 0.2, 1, 1)
 }
 const buttonFloatPeriod = 4.1;
 const buttonFloatRotationAmplitude = 0.02;
