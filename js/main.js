@@ -23,7 +23,7 @@ const rotationFreeDeceleration = 0.95;
 const rotationFacingDeceleration = 0.85;
 const faceMaximumSpeed = 7;
 const backgroundScrollMultiplier = -1;
-const shapePosition = new THREE.Vector3(0, 0, 0);
+const shapePosition = new THREE.Vector3(0, 0.25, 0);
 const shapeRadius = 1;
 const shapeFloatAmplitude = 0.1;
 const shapeFloatPeriod = 5;
@@ -33,17 +33,28 @@ const shapeFaceRequiredDot = 0.91;
 
 const titleFont = '../assets/fonts/Sophiecomic-Regular.ttf';
 const titleSize = 0.6;
-const titleKerning = -0.01;
-const titleY = 1.6;
+const titleKerning = -0.02;
+const titleColor = 0xf0ffff;
+const titleOpacity = 0.95;
+const titleY = 1.75;
 const titleShrinkRotation = 1.2;
 const titleShrinkRotationLerp = 0.2;
 const titleShrinkLerp = 0.2;
 const titleShrinkInterval = 0.03;
 const titleFloatPeriod = 4.1;
-const titleFloatRotationAmplitude = 0.05;
+const titleFloatRotationAmplitude = 0.1;
 const titleFloatRotationPhaseOffset = titleFloatPeriod / 2;
 const titleFloatAmplitude = 0.01;
 const titleFloatLetterPhaseOffset = 2;
+
+const bodyFont = '../assets/fonts/NowAlt-Regular';
+const bodySize = 0.1;
+const bodyColor = 0xf0ffff;
+const bodyOpacity = 1;
+const bodyY = -1.75;
+const bodyShrinkLerp = 0.2;
+const bodyFloatPeriod = 4.1;
+const bodyFloatAmplitude = 0.01;
 
 const shapeVertexShader = `
     attribute vec3 barycentric;
@@ -290,9 +301,9 @@ function init() {
             text.font = titleFont;
             text.text = pData.name[letter];
             text.fontSize = titleSize;
-            text.color = 0xffffff;
+            text.color = titleColor;
             text.material.transparent = true;
-            text.material.opacity = 1;
+            text.material.opacity = titleOpacity;
             if (text.text == ' ') {
                 text.text = 'l';
                 text.material.opacity = 0;
