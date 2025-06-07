@@ -6,15 +6,6 @@ import { projectData } from './projectdata.js';
 var scene, camera, renderer, clock;
 var glowMesh, dodecahedronGeometry, shapeZPivot, shapeBack, shapeFront;
 
-var normalArrows = [];
-var iconPlaceholders = [];
-var activatedIconMeshes = [];
-var iconGlowMeshes = [];
-var iconFlashMeshes = [];
-var projectNameTexts = [];
-var projectNamePlaceholders = [];
-var projcetNamePlaceholderPositions = [];
-
 const rotationMultiplier = 0.005;
 const rotationAcceleration = 0.5;
 const rotationFacingAcceleration = 5;
@@ -23,9 +14,9 @@ const rotationFreeDeceleration = 0.95;
 const rotationFacingDeceleration = 0.85;
 const faceMaximumSpeed = 7;
 const backgroundScrollMultiplier = -1;
-const shapePosition = new THREE.Vector3(0, 0.25, 0);
+const shapePosition = new THREE.Vector3(0, 0.3, 0);
 const shapeRadius = 1;
-const shapeFloatAmplitude = 0.1;
+const shapeFloatAmplitude = 0.075;
 const shapeFloatPeriod = 5;
 const shapeFloatRotationAmplitude = 0.05;
 const shapeFloatRotationOffset = shapeFloatPeriod * 0.25;
@@ -47,14 +38,17 @@ const titleFloatRotationPhaseOffset = titleFloatPeriod / 2;
 const titleFloatAmplitude = 0.01;
 const titleFloatLetterPhaseOffset = 2;
 
-const bodyFont = '../assets/fonts/NowAlt-Regular';
-const bodySize = 0.1;
+const bodyFont = '../assets/fonts/Sophiecomic-Regular.ttf';
+const bodySize = 0.18;
 const bodyColor = 0xf0ffff;
+const bodyParenthesisColor = 0xffff66;
 const bodyOpacity = 1;
-const bodyY = -1.75;
+const bodyY = -0.9;
+const bodyLineSpacing = 0.17;
+const bodyLineHeight = 0.2; // Approximate, should be about equal to the actual Y
 const bodyShrinkLerp = 0.2;
 const bodyFloatPeriod = 4.1;
-const bodyFloatAmplitude = 0.01;
+const bodyFloatRotationAmplitude = 0.03;
 
 const shapeVertexShader = `
     attribute vec3 barycentric;
@@ -127,6 +121,21 @@ const shapeFrontFragmentShader = `
     }
 `
 
+var normalArrows = [];
+var iconPlaceholders = [];
+var activatedIconMeshes = [];
+var iconGlowMeshes = [];
+var iconFlashMeshes = [];
+
+var titleLetterTexts = [];
+var titleLetterPlaceholders = [];
+var titleLetterPlaceholderPositions = [];
+var allTitlesPlaceholder = new THREE.Object3D();
+
+var bodyLineTexts = [];
+var bodyPlaceholders = [];
+var allBodiesPlaceholder = new THREE.Object3D();
+
 var mouseDown = false;
 var mousePos = new THREE.Vector2();
 var mouseVelocity = new THREE.Vector2();
@@ -136,6 +145,7 @@ var raycaster = new THREE.Raycaster();
 var focusedFace = -1;
 var focusedTime = 0;
 var titleReadyCounter = 0;
+var bodyReadyCounter = 0;
 
 function syncTextPromise(text) {
     return new Promise(resolve => text.sync(() => resolve()));
@@ -290,17 +300,24 @@ function init() {
         // scene.add(normalArrows[i]);
     };
 
+    allTitlesPlaceholder.position.set(0, titleY, 0);
+    allBodiesPlaceholder.position.set(0, bodyY, 0);
+
     for (let i = 0; i < 12; i++) {
-        const pData = projectData[i];
+        const data = projectData[i];
+
+        // Title text
+
         const letterTexts = [];
         const letterPlaceholders = [];
-        projcetNamePlaceholderPositions.push([]);
+        titleLetterPlaceholderPositions.push([]);
+        const thisTitleSize = data.nameSize ? titleSize * data.nameSize : titleSize;
 
-        for (let letter = 0; letter < pData.name.length; letter++) {
+        for (let letter = 0; letter < data.name.length; letter++) {
             const text = new Text();
             text.font = titleFont;
-            text.text = pData.name[letter];
-            text.fontSize = titleSize;
+            text.text = data.name[letter];
+            text.fontSize = thisTitleSize;
             text.color = titleColor;
             text.material.transparent = true;
             text.material.opacity = titleOpacity;
@@ -335,17 +352,63 @@ function init() {
             let incrementalWidth = 0;
             for (let letter = 0; letter < letterTexts.length; letter++) {
                 const letterCenter = new THREE.Vector3(-totalWidth / 2 + incrementalWidth + letterWidths[letter] / 2, titleY, 0);
-                const letterTopLeft = new THREE.Vector3(-letterWidths[letter] / 2, titleSize / 2, 0);
+                const letterTopLeft = new THREE.Vector3(-letterWidths[letter] / 2, thisTitleSize / 2, 0);
                 // letterPlaceholders[letter].position.copy(letterCenter);
                 letterTexts[letter].position.copy(letterTopLeft);
                 incrementalWidth += letterWidths[letter] + kerning;
-                projcetNamePlaceholderPositions[i].push(letterCenter);
+                titleLetterPlaceholderPositions[i].push(letterCenter);
             }
+
             titleReadyCounter += 1;
         });
 
-        projectNameTexts.push(letterTexts);
-        projectNamePlaceholders.push(letterPlaceholders);
+        titleLetterTexts.push(letterTexts);
+        titleLetterPlaceholders.push(letterPlaceholders);
+
+        // Body text
+
+        const thisBodyLineTexts = [];
+        bodyLineTexts.push(thisBodyLineTexts);
+        const thisBodyPlaceholder = new THREE.Object3D();
+        thisBodyPlaceholder.scale.set(0, 0, 1);
+        bodyPlaceholders.push(thisBodyPlaceholder);
+        scene.add(allBodiesPlaceholder);
+        allBodiesPlaceholder.add(thisBodyPlaceholder);
+
+        if (data.description) {
+            for (let line = 0; line < data.description.length; line++) {
+                const text = new Text();
+                text.font = bodyFont;
+                text.text = data.description[line];
+                text.fontSize = bodySize;
+                text.color = line == data.description.length - 1 ? bodyParenthesisColor : bodyColor;
+                text.material.transparent = true;
+                text.material.opacity = bodyOpacity;
+                thisBodyLineTexts.push(text);
+                thisBodyPlaceholder.add(text);
+            }
+        }
+
+        Promise.all(thisBodyLineTexts.map(syncTextPromise)).then(() => {
+            var totalHeight;
+
+            for (let line = 0; line < thisBodyLineTexts.length; line++) {
+                thisBodyLineTexts[line].geometry.computeBoundingBox();
+                const bbox = thisBodyLineTexts[line].geometry.boundingBox;
+                const size = new THREE.Vector3();
+                bbox.getSize(size);
+
+                if (line == 0) {
+                    totalHeight = bodyLineSpacing * (thisBodyLineTexts.length - 1) + bodyLineHeight;
+                    bodyPlaceholders[i].position.y = -totalHeight / 2;
+                }
+
+                thisBodyLineTexts[line].position.x = -size.x / 2;
+                thisBodyLineTexts[line].position.y = totalHeight / 2 - bodyLineSpacing * line;
+            }
+
+            bodyReadyCounter += 1;
+        });
     }
 
     camera.position.z = 5;
@@ -385,7 +448,6 @@ function animate() {
     var bestNormal = null;
     var normals = [];
     for (let i = 0; i < 12; i++) {
-        // console.log(dodecahedronGeometry.attributes.normal.array[i]);
         const normal = new THREE.Vector3(shapeNormals[i*45], shapeNormals[(i*45)+1], shapeNormals[(i*45)+2]).applyMatrix3(normalMatrix).normalize();
         const dot = normal.dot(faceDirection);
         // normalArrows[i].setDirection(normal);
@@ -411,28 +473,36 @@ function animate() {
         focusedFace = -1;
     }
 
-    if (titleReadyCounter == projectData.length) {
+    if (titleReadyCounter == projectData.length && bodyReadyCounter == projectData.length) {
         for (let i = 0; i < 12; i++) {
-            for (let letter = 0; letter < projectNamePlaceholders[i].length; letter++) {
+            for (let letter = 0; letter < titleLetterPlaceholders[i].length; letter++) {
                 const show = (i == focusedFace && focusedTime >= letter * titleShrinkInterval);
 
                 const targetScale = show ? 1 : 0;
-                const currentScale = projectNamePlaceholders[i][letter].scale.x;
+                const currentScale = titleLetterPlaceholders[i][letter].scale.x;
                 const newScale = currentScale + titleShrinkLerp * (targetScale - currentScale);
-                projectNamePlaceholders[i][letter].scale.set(newScale, newScale, 1);
+                titleLetterPlaceholders[i][letter].scale.set(newScale, newScale, 1);
             
                 const targetRotation = show ? 0 : titleShrinkRotation;
-                const currentRotation = projectNamePlaceholders[i][letter].rotation.z;
+                const currentRotation = titleLetterPlaceholders[i][letter].rotation.z;
                 const newRotation = currentRotation + titleShrinkRotationLerp * (targetRotation - currentRotation);
-                projectNamePlaceholders[i][letter].rotation.z = newRotation;
+                titleLetterPlaceholders[i][letter].rotation.z = newRotation;
 
                 if (show) {
-                    const newPosition = projcetNamePlaceholderPositions[i][letter].clone();
+                    const newPosition = titleLetterPlaceholderPositions[i][letter].clone();
                     newPosition.y = titleY + titleFloatAmplitude * Math.cos(clock.getElapsedTime() * Math.PI * 2 / titleFloatPeriod - titleFloatLetterPhaseOffset * letter);
-                    projectNamePlaceholders[i][letter].position.copy(newPosition);
-                    projectNamePlaceholders[i][letter].rotation.z = titleFloatRotationAmplitude * Math.cos(clock.getElapsedTime() * Math.PI * 2 / titleFloatPeriod - titleFloatRotationPhaseOffset - titleFloatLetterPhaseOffset * letter);
+                    titleLetterPlaceholders[i][letter].position.copy(newPosition);
+                    titleLetterPlaceholders[i][letter].rotation.z = titleFloatRotationAmplitude * Math.cos(clock.getElapsedTime() * Math.PI * 2 / titleFloatPeriod - titleFloatRotationPhaseOffset - titleFloatLetterPhaseOffset * letter);
                 }
             }
+
+            const showBody = (i == focusedFace);
+
+            const targetBodyScale = showBody ? 1 : 0;
+            const currentBodyScale = bodyPlaceholders[i].scale.x;
+            const newBodyScale = currentBodyScale + bodyShrinkLerp * (targetBodyScale - currentBodyScale);
+            bodyPlaceholders[i].scale.set(newBodyScale, newBodyScale, 1);
+            bodyPlaceholders[i].rotation.z = bodyFloatRotationAmplitude * Math.cos(clock.getElapsedTime() * Math.PI * 2 / bodyFloatPeriod);
         }
     }
     
