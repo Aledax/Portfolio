@@ -6,15 +6,18 @@ import { projectData } from './projectdata.js';
 
 // Parameters
 
+const cameraPosition = new THREE.Vector3(0, 0, 5);
+
 const shapeRotationHeldSpeed = 0.005;
 const shapeRotationHeldAcceleration = 0.5;
 const shapeRotationHeldDeceleration = 0.75;
 const shapeRotationFocusedAcceleration = 5;
-const shapeRotationFocusedDeceleration = 0.85;
-const shapeRotationFreeDeceleration = 0.95;
+const shapeRotationFocusedDeceleration = 0.9;
+const shapeRotationFreeDeceleration = 0.965;
 const shapeFocusMaximumSpeed = 7;
 const backgroundScrollSpeed = -1;
 const shapePosition = new THREE.Vector3(0, 0.31, 0);
+const shapeToCamera = cameraPosition.clone().sub(shapePosition).normalize();
 const shapeRadius = 1;
 const shapeFloatAmplitude = 0.075;
 const shapeFloatPeriod = 5;
@@ -78,7 +81,6 @@ const buttonFloatButtonPhaseOffset = 2;
 var scene, camera, renderer, clock;
 var glowMesh, dodecahedronGeometry, shapeZPivot, shapeBack, shapeFront;
 
-var normalArrows = [];
 var iconPlaceholders = [];
 var activatedIconMeshes = [];
 var iconGlowMeshes = [];
@@ -271,16 +273,6 @@ function init() {
     shapeZPivot.add(shapeBack);
     shapeZPivot.add(shapeFront);
 
-    for (let i = 0; i < 12; i++) {
-        normalArrows.push(new THREE.ArrowHelper(
-            new THREE.Vector3(1, 0, 0),
-            new THREE.Vector3(0, 0, 0),
-            1,
-            0xff0000
-        ));
-        // scene.add(normalArrows[i]);
-    };
-
     allTitlesPlaceholder.position.set(0, titleY, 0);
     allBodiesPlaceholder.position.set(0, bodyY, 0);
 
@@ -452,7 +444,7 @@ function init() {
         buttonTexts.push(thisButtonTexts);
     }
 
-    camera.position.z = 5;
+    camera.position.copy(cameraPosition);
 
     animate();
 }
@@ -483,16 +475,13 @@ function animate() {
 
     const normalMatrix = new THREE.Matrix3().getNormalMatrix(shapeFront.matrixWorld);
     const shapeNormals = dodecahedronGeometry.attributes.normal.array;
-    const faceDirection = new THREE.Vector3(0, 0, 1.0);
     var highestDot = -1;
     var bestIndex = -1;
     var bestNormal = null;
     var normals = [];
     for (let i = 0; i < 12; i++) {
         const normal = new THREE.Vector3(shapeNormals[i*45], shapeNormals[(i*45)+1], shapeNormals[(i*45)+2]).applyMatrix3(normalMatrix).normalize();
-        const dot = normal.dot(faceDirection);
-        // normalArrows[i].setDirection(normal);
-        // normalArrows[i].setColor(0xff0000);
+        const dot = normal.dot(shapeToCamera);
         if (dot > highestDot) {
             highestDot = dot;
             bestIndex = i;
@@ -507,7 +496,6 @@ function animate() {
         activatedIconMeshes[focusedFace].material.opacity = 1;
         iconGlowMeshes[focusedFace].material.opacity = 1;
         iconFlashMeshes[focusedFace].material.opacity = 1;
-        // normalArrows[bestIndex].setColor(0x00ff00);
     }
 
     if (focusedFace != -1 && (focusedFace != bestIndex || bestNormal <= shapeFocusRequiredDot)) {
@@ -574,10 +562,10 @@ function animate() {
             const worldX = localX.clone().applyQuaternion(activatedIconMeshes[i].getWorldQuaternion(new THREE.Quaternion()));
             const currentAngle = Math.atan2(worldX.y, worldX.x);
             const spinQuaternion = new THREE.Quaternion();
-            spinQuaternion.setFromAxisAngle(new THREE.Vector3(0, 0, 1), -currentAngle * 0.1);
+            spinQuaternion.setFromAxisAngle(shapeToCamera, -currentAngle * 0.1);
             activatedIconMeshes[i].quaternion.premultiply(spinQuaternion);
         } else {
-            const brightness = Math.pow(Math.max(0, normals[i].dot(faceDirection)), 7) * 0.5;
+            const brightness = Math.pow(Math.max(0, normals[i].dot(shapeToCamera)), 7) * 0.5;
             activatedIconMeshes[i].material.opacity += 0.4 * (brightness - activatedIconMeshes[i].material.opacity);
             iconGlowMeshes[i].material.opacity += 0.4 * (brightness - iconGlowMeshes[i].material.opacity);
         }
@@ -588,8 +576,10 @@ function animate() {
         mouseVelocity.multiplyScalar(shapeRotationHeldDeceleration);
     } else {
         if (focusedFace != -1) {
-            const resolveDirection = new THREE.Vector2(-bestNormal.x, bestNormal.y);
-            mouseVelocity.add(resolveDirection.multiplyScalar(shapeRotationFocusedAcceleration));
+            const resolveDirection = shapeToCamera.clone().sub(bestNormal);
+            const angularMagnitude = resolveDirection.length();
+            const resolveDirection2D = new THREE.Vector2(resolveDirection.x, -resolveDirection.y).normalize();
+            mouseVelocity.add(resolveDirection2D.multiplyScalar(shapeRotationFocusedAcceleration * angularMagnitude));
             mouseVelocity.multiplyScalar(shapeRotationFocusedDeceleration);
         } else {
             mouseVelocity.multiplyScalar(shapeRotationFreeDeceleration);
