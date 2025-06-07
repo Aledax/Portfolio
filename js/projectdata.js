@@ -6,7 +6,7 @@ export const projectData = [
         ],
         links: [
             {
-                name: 'Get Lucky',
+                name: 'Tune In',
                 type: 'radio',
                 links: [
                     'https://www.youtube.com/watch?v=INbgG9M0WYE',
