@@ -13,7 +13,7 @@ const shapeRotationHeldAcceleration = 0.5;
 const shapeRotationHeldDeceleration = 0.75;
 const shapeRotationFocusedAcceleration = 5;
 const shapeRotationFocusedDeceleration = 0.9;
-const shapeRotationFreeDeceleration = 0.97;
+const shapeRotationFreeDeceleration = 0.95;
 const shapeFocusMaximumSpeed = 10;
 const backgroundScrollSpeed = -1;
 const shapePosition = new THREE.Vector3(0, 0.31, 0);
@@ -23,7 +23,7 @@ const shapeFloatAmplitude = 0.075;
 const shapeFloatPeriod = 5;
 const shapeFloatRotationAmplitude = 0.05;
 const shapeFloatRotationOffset = shapeFloatPeriod * 0.25;
-const shapeFocusRequiredDot = 0.92;
+const shapeFocusRequiredDot = 0.94;
 
 const titleFont = '../assets/fonts/Sophiecomic-Regular.ttf';
 const titleSize = 0.55;
@@ -276,6 +276,7 @@ function init() {
             iconPlaceholders[i] = iconPlaceholder;
             activatedIconMeshes[i] = activatedIconMesh;
             activatedIconMesh.renderOrder = 2;
+            iconGlowMesh.material.opacity = 0;
             iconGlowMeshes[i] = iconGlowMesh;
             iconFlashMesh.material.opacity = 0;
             iconFlashMeshes[i] = iconFlashMesh;
