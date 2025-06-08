@@ -1,6 +1,7 @@
 export const projectData = [
     {
         name: 'Space Radio',
+        iconSize: 1.05,
         description: [
             'What\'s this?'
         ],
@@ -28,8 +29,9 @@ export const projectData = [
     {
         name: 'Wire Construction',
         nameSize: 0.7,
+        iconSize: 1.1,
         description: [
-            'An geometric game about building',
+            'A geometric game about building',
             '3D shapes',
             '(Python)'
         ],
@@ -42,10 +44,10 @@ export const projectData = [
         ]
     },
     {
-        name: '. Alex Day .',
+        name: 'Alex Day',
         nameSize: 1.2,
         description: [
-            'Welcome to my site!',
+            'A project collection',
             'Drag the shape to see more...'
         ],
         links: [
@@ -59,6 +61,7 @@ export const projectData = [
     {
         name: 'Up And Away',
         nameSize: 0.9,
+        iconSize: 1.1,
         description: [
             'A platformer in a flooding world, full',
             'of characters, puzzles, and mystery...',
@@ -95,6 +98,7 @@ export const projectData = [
     {
         name: 'Dance Battle',
         nameSize: 0.9,
+        iconSize: 1.05,
         description: [
             'Just Dance! One player makes the',
             'moves, and the other follows',
@@ -110,6 +114,7 @@ export const projectData = [
     },
     {
         name: '2D Splatoon',
+        iconSize: 1.05,
         description: [
             'An example of how Splatoon might',
             'look as a 2D game',
@@ -129,13 +134,14 @@ export const projectData = [
         name: 'Cross Fingers',
         nameSize: 0.9,
         description: [
-            'An exact recreation of Cross Fingers.',
-            'Just so I could make my own levels',
+            'An exact recreation of Cross Fingers,',
+            'just so I could make my own levels',
             '(Python)'
         ]
     },
     {
         name: 'Elektris',
+        iconSize: 1.15,
         description: [
             'Space-themed, Tetris-style arcade',
             'game. How far can you get?',

@@ -19,12 +19,14 @@ async function processImage(rawPath, unactivatedPath, activatedPath) {
                 this.bitmap.data[idx + 0] = 200;
                 this.bitmap.data[idx + 1] = 225;
                 this.bitmap.data[idx + 2] = 255;
+            } else if (r === 255 && g === 255 && b === 255) {
+                this.bitmap.data[idx + 3] = 0;
             }
         });
 
         await image.write(unactivatedPath);
 
-        image.gaussian(2);
+        image.gaussian(1);
 
         await image.write(activatedPath);
 
