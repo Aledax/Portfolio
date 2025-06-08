@@ -65,7 +65,7 @@ export const projectData = [
         description: [
             'A platformer in a flooding world, full',
             'of characters, puzzles, and mystery...',
-            '(Godot, Entry to 1-Bit Game Jam #1)'
+            '(Godot, Entry to 1-BIT JAM #2)'
         ],
         links: [
             {
