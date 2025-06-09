@@ -67,7 +67,7 @@ const buttonColors = {
     'github': new THREE.Vector4(0.2, 0.85, 1, 1),
     'play': new THREE.Vector4(1, 0.2, 0.9, 1),
     'video': new THREE.Vector4(0.2, 1, 0.4, 1),
-    'radio': new THREE.Vector4(0.4, 0.2, 1, 1)
+    'radio': new THREE.Vector4(0.5, 0.4, 1, 1)
 }
 const buttonFloatPeriod = 4.1;
 const buttonFloatRotationAmplitude = 0.02;

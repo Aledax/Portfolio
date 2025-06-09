@@ -119,6 +119,13 @@ export const projectData = [
             'An example of how Splatoon might',
             'look as a 2D game',
             '(Unity, C#)'
+        ],
+        links: [
+            {
+                name: 'YouTube',
+                type: 'video',
+                link: 'https://youtu.be/tSd06MvC7mg?t=409'
+            }
         ]
     },
     {
