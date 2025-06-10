@@ -10,3 +10,34 @@ body {
 canvas {
     display: block;
 }
+
+@font-face {
+    font-family: sophie-comic;
+    src: url('../assets/fonts/Sophiecomic-Regular.ttf')
+}
+
+#loading-screen {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background-color: black;
+    color: #77ffff;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 9999;
+    transition: opacity 0.5s ease;
+}
+
+.loader {
+  font-size: 3em;
+  font-family: sophie-comic, sans-serif;
+  animation: blink 1s infinite;
+}
+
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}

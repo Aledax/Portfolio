@@ -102,7 +102,6 @@ var buttonTexts = [];
 
 // States
 
-var renderStarted = false;
 var shapeMouseDown = false;
 var mousePos = new THREE.Vector2();
 var mouseVelocity = new THREE.Vector2();
@@ -128,6 +127,8 @@ for (let face = 0; face < projectData.length; face++) {
 }
 
 var readyCounter = 0;
+var readyLimit = 37;
+var ready = false;
 
 function syncTextPromise(text) {
     return new Promise(resolve => text.sync(() => resolve()));
@@ -503,7 +504,14 @@ function rotateShape() {
 function animate() {
 
     requestAnimationFrame(animate);
-    if (readyCounter < 37) return;
+    if (readyCounter < readyLimit) return;
+
+    if (!ready) {
+        ready = true;
+        setTimeout(() => {
+            document.getElementById('loading-screen').style.opacity = 0;
+        });
+    }
 
     const elapsed = clock.getDelta();
 
@@ -689,6 +697,8 @@ function tryOpenLink() {
 }
 
 function onPress(x, y) {
+
+    if (!ready) return;
 
     mousePos = new THREE.Vector2(x, y);
 
