@@ -3,7 +3,7 @@ export const projectData = [
         name: 'Space Radio',
         iconSize: 1.05,
         description: [
-            'What\'s this?'
+            'Randomized song picker'
         ],
         links: [
             {
@@ -135,6 +135,13 @@ export const projectData = [
             'Using WaniKani\'s API for better',
             'Japanese learning',
             '(Python)'
+        ],
+        links: [
+            {
+                name: 'GitHub',
+                type: 'github',
+                link: 'https://github.com/Aledax/WK-Vocabulary-Quizzer#'
+            }
         ]
     },
     {
@@ -142,7 +149,8 @@ export const projectData = [
         nameSize: 0.9,
         description: [
             'An exact recreation of Cross Fingers,',
-            'just so I could make my own levels',
+            'just so I could make my own levels.',
+            'Currently unavailable.',
             '(Python)'
         ]
     },
@@ -167,7 +175,8 @@ export const projectData = [
         nameSize: 0.8,
         description: [
             'One-off about clicking buttons',
-            'quickly and accurately',
+            'quickly and accurately.',
+            'Currently unavailable',
             '(Python)'
         ]
     },
