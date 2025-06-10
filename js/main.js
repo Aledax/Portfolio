@@ -510,6 +510,7 @@ function animate() {
         ready = true;
         setTimeout(() => {
             document.getElementById('loading-screen').style.opacity = 0;
+            document.getElementById('loading-screen').style.pointerEvents = 'none';
         });
     }
 
