@@ -320,6 +320,7 @@ function init() {
             const text = new Text();
             text.font = titleFont;
             text.text = data.name[letter];
+            text.sdfGlyphSize = 128;
             text.fontSize = thisTitleSize;
             text.color = titleColor;
             text.material.transparent = true;
@@ -383,6 +384,7 @@ function init() {
                 const text = new Text();
                 text.font = bodyFont;
                 text.text = data.description[line];
+                text.sdfGlyphSize = 128;
                 text.fontSize = bodyFontSize;
                 text.color = line == data.description.length - 1 ? bodyParenthesisColor : bodyColor;
                 text.material.transparent = true;
@@ -448,6 +450,7 @@ function init() {
                 const text = new Text();
                 text.font = buttonFont;
                 text.text = linkData.name;
+                text.sdfGlyphSize = 128;
                 text.fontSize = buttonFontSize;
                 text.color = buttonFontColor;
                 text.material.transparent = true;
