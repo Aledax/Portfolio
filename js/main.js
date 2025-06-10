@@ -15,7 +15,9 @@ const shapeRotationFocusedAcceleration = 5;
 const shapeRotationFocusedDeceleration = 0.9;
 const shapeRotationFreeDeceleration = 0.95;
 const shapeFocusMaximumSpeed = 10;
-const backgroundScrollSpeed = -1;
+const backgroundSkyScrollSpeed = -0.75;
+const backgroundStarsScrollSpeed = -0.85;
+const backgroundStarsScrollSpeed2 = -1.15;
 const shapePosition = new THREE.Vector3(0, 0.31, 0);
 const shapeToCamera = cameraPosition.clone().sub(shapePosition).normalize();
 const shapeRadius = 1;
@@ -104,7 +106,9 @@ var shapeMouseDown = false;
 var mousePos = new THREE.Vector2();
 var mouseVelocity = new THREE.Vector2();
 var normalizedMousePos = new THREE.Vector2();
-var backgroundScrollPos = new THREE.Vector2(0, 0);
+var backgroundSkyScrollPos = new THREE.Vector2(0, 0);
+var backgroundStarsScrollPos = new THREE.Vector2(0, 0);
+var backgroundStarsScrollPos2 = new THREE.Vector2(0, 0);
 var raycaster = new THREE.Raycaster();
 var focusedFace = -1;
 var discoveredFaces = Array(12).fill(false);
@@ -624,8 +628,10 @@ function animate() {
 
     renderer.render(scene, camera);
 
-    backgroundScrollPos.add(new THREE.Vector2(mouseVelocity.x * backgroundScrollSpeed, mouseVelocity.y * backgroundScrollSpeed));
-    document.body.style.backgroundPosition = `${backgroundScrollPos.x}px ${backgroundScrollPos.y}px`;
+    backgroundSkyScrollPos.add(new THREE.Vector2(mouseVelocity.x * backgroundSkyScrollSpeed, mouseVelocity.y * backgroundSkyScrollSpeed));
+    backgroundStarsScrollPos.add(new THREE.Vector2(mouseVelocity.x * backgroundStarsScrollSpeed, mouseVelocity.y * backgroundStarsScrollSpeed));
+    backgroundStarsScrollPos2.add(new THREE.Vector2(mouseVelocity.x * backgroundStarsScrollSpeed2, mouseVelocity.y * backgroundStarsScrollSpeed2));
+    document.body.style.backgroundPosition = `${backgroundStarsScrollPos.x}px ${backgroundStarsScrollPos.y}px, ${backgroundStarsScrollPos2.x}px ${backgroundStarsScrollPos2.y}px, ${backgroundSkyScrollPos.x}px ${backgroundSkyScrollPos.y}px`;
 }
 
 function updateHoveringLink(x, y) {
