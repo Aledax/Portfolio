@@ -102,6 +102,7 @@ var buttonTexts = [];
 
 // States
 
+var renderStarted = false;
 var shapeMouseDown = false;
 var mousePos = new THREE.Vector2();
 var mouseVelocity = new THREE.Vector2();
@@ -126,10 +127,7 @@ for (let face = 0; face < projectData.length; face++) {
     }
 }
 
-var iconReadyCounter = 0;
-var titleReadyCounter = 0;
-var bodyReadyCounter = 0;
-var buttonReadyCounter = 0;
+var readyCounter = 0;
 
 function syncTextPromise(text) {
     return new Promise(resolve => text.sync(() => resolve()));
@@ -186,16 +184,16 @@ function init() {
 
     // SHAPE
 
-    const textureLoader = new THREE.TextureLoader();
+    const glowLoader = new THREE.TextureLoader();
     const glowURL = new URL(
         '../assets/images/glow.png?as=webp',
         import.meta.url
     );
-    const glowTexture = textureLoader.load(glowURL);
+    const glowTexture = glowLoader.load(glowURL);
     const glowMaterial = new THREE.MeshBasicMaterial({
         map: glowTexture,
         transparent: true,
-        opacity: 0.75,
+        opacity: 0.85,
         depthWrite: false,
         blending: THREE.AdditiveBlending
     });
@@ -214,7 +212,7 @@ function init() {
     dodecahedronGeometry.setAttribute('barycentric', new THREE.Float32BufferAttribute(barycentric, 3));
 
     shapeZPivot = new THREE.Object3D();
-    scene.add(shapeZPivot);
+    scene.add(shapeZPivot)
     
     const shapeBackMaterial = new THREE.ShaderMaterial({
         transparent: true,
@@ -232,7 +230,7 @@ function init() {
     shapeFront = new THREE.Mesh(dodecahedronGeometry, shapeFrontMaterial);
     
     const initialQuaternion = new THREE.Quaternion();
-    initialQuaternion.setFromAxisAngle(new THREE.Vector3(1, 0, 0), -59 * Math.PI / 180);
+    initialQuaternion.setFromAxisAngle(new THREE.Vector3(1, 0, 0), -55 * Math.PI / 180);
     shapeBack.quaternion.premultiply(initialQuaternion);
     shapeFront.quaternion.premultiply(initialQuaternion);
     shapeZPivot.add(shapeBack);
@@ -244,9 +242,30 @@ function init() {
 
     const iconGlowGeometry = new THREE.PlaneGeometry(0.75, 0.75);
     const iconFlashGeometry = new THREE.PlaneGeometry(1.5, 1.5);
+    const loadingManager = new THREE.LoadingManager();
+    loadingManager.onLoad = () => {
+        shapeFront.updateMatrixWorld(true);
+
+        for (let i = 0; i < 12; i++) {
+            const normal = new THREE.Vector3(
+                shapeNormals[i*45],
+                shapeNormals[i*45+1],
+                shapeNormals[i*45+2]
+            ).normalize();
+
+            iconPlaceholders[i].position.copy(normal.clone().multiplyScalar(0.8));
+            iconPlaceholders[i].lookAt(normal.clone().multiplyScalar(2).applyMatrix4(shapeFront.matrixWorld));
+            console.log(i, normal.clone().multiplyScalar(2).applyMatrix4(shapeFront.matrixWorld));
+        }
+
+        readyCounter += 1;
+    };
+    const iconLoader = new THREE.TextureLoader(loadingManager);
 
     for (let i = 0; i < 12; i++) {
+
         let iconPath = `../assets/images/icons/activated/icon${i}.png?as=webp`;
+
         fetch(iconPath).then(response => {
             if (!response.ok) {
                 iconPath = '../assets/images/icons/activated/sampleicon.png?as=webp';
@@ -255,7 +274,7 @@ function init() {
                 iconPath,
                 import.meta.url
             );
-            const activatedIconTexture = textureLoader.load(activatedIconURL, texture => {
+            const activatedIconTexture = iconLoader.load(activatedIconURL, texture => {
                 texture.minFilter = THREE.NearestFilter;
                 texture.magFilter = THREE.NearestFilter;
                 texture.generateMipmaps = false;
@@ -284,20 +303,11 @@ function init() {
             iconGlowMeshes[i] = iconGlowMesh;
             iconFlashMesh.material.opacity = 0;
             iconFlashMeshes[i] = iconFlashMesh;
-
-            const normal = new THREE.Vector3(
-                shapeNormals[i*45],
-                shapeNormals[i*45+1],
-                shapeNormals[i*45+2]
-            ).normalize();
+            
             shapeFront.add(iconPlaceholder);
             iconPlaceholder.add(activatedIconMesh);
             iconPlaceholder.add(iconGlowMesh);
             iconPlaceholder.add(iconFlashMesh);
-            iconPlaceholder.position.copy(normal.clone().multiplyScalar(0.8));
-            iconPlaceholder.lookAt(normal.clone().multiplyScalar(2).applyMatrix4(shapeFront.matrixWorld));
-
-            iconReadyCounter += 1;
         });
     }
 
@@ -363,7 +373,7 @@ function init() {
                 titleLetterPlaceholderPositions[i].push(letterCenter);
             }
 
-            titleReadyCounter += 1;
+            readyCounter += 1;
         });
 
         titleLetterTexts.push(letterTexts);
@@ -412,7 +422,7 @@ function init() {
                 thisBodyLineTexts[line].position.y = totalHeight / 2 - bodyLineSpacing * line;
             }
 
-            bodyReadyCounter += 1;
+            readyCounter += 1;
         });
 
         // Buttons
@@ -470,7 +480,7 @@ function init() {
                 thisButtonTexts[link].position.set(-size.x / 2, size.y / 2 + buttonFontOffsetY, 0.1);
             }
 
-            buttonReadyCounter += 1;
+            readyCounter += 1;
         });
 
         buttonPlaceholders.push(thisButtonPlaceholders);
@@ -493,6 +503,8 @@ function rotateShape() {
 function animate() {
 
     requestAnimationFrame(animate);
+    if (readyCounter < 37) return;
+
     const elapsed = clock.getDelta();
 
     if (focusedFace != -1) {
@@ -527,90 +539,84 @@ function animate() {
         worldNormals.push(worldNormal);
     }
 
-    if (iconReadyCounter == projectData.length) {
-        for (let i = 0; i < 12; i++) {
-            if (i == focusedFace) {
-                const localX = new THREE.Vector3(1, 0, 0);
-                const worldX = localX.clone().applyQuaternion(activatedIconMeshes[i].getWorldQuaternion(new THREE.Quaternion()));
-                const currentAngle = Math.atan2(worldX.y, worldX.x);
-                activatedIconMeshes[i].rotation.set(0, 0, activatedIconMeshes[i].rotation.z - currentAngle * 0.1);
-            }
-            if (discoveredFaces[i]) {
-                activatedIconMeshes[i].material.opacity += 0.4 * (0.9 - activatedIconMeshes[i].material.opacity);
-                iconGlowMeshes[i].material.opacity += 0.4 * (0.9 - iconGlowMeshes[i].material.opacity);
-            } else {
-                const brightness = Math.pow(Math.max(0, worldNormals[i].dot(shapeToCamera)), 6) * 0.5;
-                activatedIconMeshes[i].material.opacity += 0.4 * (brightness - activatedIconMeshes[i].material.opacity);
-                iconGlowMeshes[i].material.opacity += 0.4 * (brightness - iconGlowMeshes[i].material.opacity);
-            }
-            iconFlashMeshes[i].material.opacity *= 0.95;
+    for (let i = 0; i < 12; i++) {
+        if (i == focusedFace) {
+            const localX = new THREE.Vector3(1, 0, 0);
+            const worldX = localX.clone().applyQuaternion(activatedIconMeshes[i].getWorldQuaternion(new THREE.Quaternion()));
+            const currentAngle = Math.atan2(worldX.y, worldX.x);
+            activatedIconMeshes[i].rotation.set(0, 0, activatedIconMeshes[i].rotation.z - currentAngle * 0.1);
         }
+        if (discoveredFaces[i]) {
+            activatedIconMeshes[i].material.opacity += 0.4 * (0.9 - activatedIconMeshes[i].material.opacity);
+            iconGlowMeshes[i].material.opacity += 0.4 * (0.9 - iconGlowMeshes[i].material.opacity);
+        } else {
+            const brightness = Math.pow(Math.max(0, worldNormals[i].dot(shapeToCamera)), 6) * 0.5;
+            activatedIconMeshes[i].material.opacity += 0.4 * (brightness - activatedIconMeshes[i].material.opacity);
+            iconGlowMeshes[i].material.opacity += 0.4 * (brightness - iconGlowMeshes[i].material.opacity);
+        }
+        iconFlashMeshes[i].material.opacity *= 0.95;
     }
 
     if (!shapeMouseDown && focusedFace == -1 && bestIndex != -1 && highestDot >= shapeFocusRequiredDot && mouseVelocity.length() <= shapeFocusMaximumSpeed) {
         focusedFace = bestIndex;
         discoveredFaces[focusedFace] = true;
         focusedTime = 0;
-        if (iconReadyCounter == projectData.length) {
-            activatedIconMeshes[focusedFace].material.opacity = 1;
-            iconGlowMeshes[focusedFace].material.opacity = 1;
-            iconFlashMeshes[focusedFace].material.opacity = 1;
-        }
+        activatedIconMeshes[focusedFace].material.opacity = 1;
+        iconGlowMeshes[focusedFace].material.opacity = 1;
+        iconFlashMeshes[focusedFace].material.opacity = 1;
     }
 
     if (focusedFace != -1 && (focusedFace != bestIndex || bestNormal <= shapeFocusRequiredDot)) {
         focusedFace = -1;
     }
 
-    if (titleReadyCounter == projectData.length && bodyReadyCounter == projectData.length && buttonReadyCounter == projectData.length) {
-        for (let i = 0; i < 12; i++) {
+    for (let i = 0; i < 12; i++) {
 
-            // Titles
+        // Titles
 
-            for (let letter = 0; letter < titleLetterPlaceholders[i].length; letter++) {
-                const show = (i == focusedFace && focusedTime >= letter * titleShrinkInterval);
+        for (let letter = 0; letter < titleLetterPlaceholders[i].length; letter++) {
+            const show = (i == focusedFace && focusedTime >= letter * titleShrinkInterval);
 
-                const targetScale = show ? 1 : 0;
-                const currentScale = titleLetterPlaceholders[i][letter].scale.x;
-                const newScale = currentScale + titleShrinkLerp * (targetScale - currentScale);
-                titleLetterPlaceholders[i][letter].scale.set(newScale, newScale, 1);
-            
-                const targetRotation = show ? 0 : titleShrinkRotation;
-                const currentRotation = titleLetterPlaceholders[i][letter].rotation.z;
-                const newRotation = currentRotation + titleShrinkRotationLerp * (targetRotation - currentRotation);
-                titleLetterPlaceholders[i][letter].rotation.z = newRotation;
-
-                if (show) {
-                    const newPosition = titleLetterPlaceholderPositions[i][letter].clone();
-                    newPosition.y = titleY + titleFloatAmplitude * Math.cos(clock.getElapsedTime() * Math.PI * 2 / titleFloatPeriod - titleFloatLetterPhaseOffset * letter);
-                    titleLetterPlaceholders[i][letter].position.copy(newPosition);
-                    titleLetterPlaceholders[i][letter].rotation.z = titleFloatRotationAmplitude * Math.cos(clock.getElapsedTime() * Math.PI * 2 / titleFloatPeriod - titleFloatRotationPhaseOffset - titleFloatLetterPhaseOffset * letter);
-                }
-            }
-
-            // Bodies
-
-            const showBody = (i == focusedFace);
-
-            const targetBodyScale = showBody ? 1 : 0;
-            const currentBodyScale = bodyPlaceholders[i].scale.x;
-            const newBodyScale = currentBodyScale + bodyShrinkLerp * (targetBodyScale - currentBodyScale);
-            bodyPlaceholders[i].scale.set(newBodyScale, newBodyScale, 1);
-            bodyPlaceholders[i].rotation.z = bodyFloatRotationAmplitude * Math.cos(clock.getElapsedTime() * Math.PI * 2 / bodyFloatPeriod);
+            const targetScale = show ? 1 : 0;
+            const currentScale = titleLetterPlaceholders[i][letter].scale.x;
+            const newScale = currentScale + titleShrinkLerp * (targetScale - currentScale);
+            titleLetterPlaceholders[i][letter].scale.set(newScale, newScale, 1);
         
-            // Buttons
+            const targetRotation = show ? 0 : titleShrinkRotation;
+            const currentRotation = titleLetterPlaceholders[i][letter].rotation.z;
+            const newRotation = currentRotation + titleShrinkRotationLerp * (targetRotation - currentRotation);
+            titleLetterPlaceholders[i][letter].rotation.z = newRotation;
 
-            for (let link = 0; link < buttonPlaceholders[i].length; link++) {
-                const show = (i == focusedFace);
-
-                const targetScale = show ? (link == hoveringButton ? 1.15 : 1) : 0;
-                const currentScale = buttonPlaceholders[i][link].scale.x;
-                const newScale = currentScale + buttonShrinkLerp * (targetScale - currentScale);
-                buttonPlaceholders[i][link].scale.set(newScale, newScale, 1);
-            
-                buttonPlaceholders[i][link].position.y = buttonY + buttonFloatAmplitude * Math.cos(clock.getElapsedTime() * Math.PI * 2 / buttonFloatPeriod - buttonFloatButtonPhaseOffset * link);
-                buttonPlaceholders[i][link].rotation.z = buttonFloatRotationAmplitude * Math.cos(clock.getElapsedTime() * Math.PI * 2 / buttonFloatPeriod - buttonFloatRotationPhaseOffset - buttonFloatButtonPhaseOffset * link);
+            if (show) {
+                const newPosition = titleLetterPlaceholderPositions[i][letter].clone();
+                newPosition.y = titleY + titleFloatAmplitude * Math.cos(clock.getElapsedTime() * Math.PI * 2 / titleFloatPeriod - titleFloatLetterPhaseOffset * letter);
+                titleLetterPlaceholders[i][letter].position.copy(newPosition);
+                titleLetterPlaceholders[i][letter].rotation.z = titleFloatRotationAmplitude * Math.cos(clock.getElapsedTime() * Math.PI * 2 / titleFloatPeriod - titleFloatRotationPhaseOffset - titleFloatLetterPhaseOffset * letter);
             }
+        }
+
+        // Bodies
+
+        const showBody = (i == focusedFace);
+
+        const targetBodyScale = showBody ? 1 : 0;
+        const currentBodyScale = bodyPlaceholders[i].scale.x;
+        const newBodyScale = currentBodyScale + bodyShrinkLerp * (targetBodyScale - currentBodyScale);
+        bodyPlaceholders[i].scale.set(newBodyScale, newBodyScale, 1);
+        bodyPlaceholders[i].rotation.z = bodyFloatRotationAmplitude * Math.cos(clock.getElapsedTime() * Math.PI * 2 / bodyFloatPeriod);
+    
+        // Buttons
+
+        for (let link = 0; link < buttonPlaceholders[i].length; link++) {
+            const show = (i == focusedFace);
+
+            const targetScale = show ? (link == hoveringButton ? 1.15 : 1) : 0;
+            const currentScale = buttonPlaceholders[i][link].scale.x;
+            const newScale = currentScale + buttonShrinkLerp * (targetScale - currentScale);
+            buttonPlaceholders[i][link].scale.set(newScale, newScale, 1);
+        
+            buttonPlaceholders[i][link].position.y = buttonY + buttonFloatAmplitude * Math.cos(clock.getElapsedTime() * Math.PI * 2 / buttonFloatPeriod - buttonFloatButtonPhaseOffset * link);
+            buttonPlaceholders[i][link].rotation.z = buttonFloatRotationAmplitude * Math.cos(clock.getElapsedTime() * Math.PI * 2 / buttonFloatPeriod - buttonFloatRotationPhaseOffset - buttonFloatButtonPhaseOffset * link);
         }
     }
 
@@ -638,25 +644,23 @@ function animate() {
 }
 
 function updateHoveringLink(x, y) {
-    if (buttonReadyCounter == projectData.length) {
-        normalizedMousePos = new THREE.Vector2(
-            (x / window.innerWidth) * 2 - 1,
-            (y / window.innerHeight) * -2 + 1
-        );
-        raycaster.setFromCamera(normalizedMousePos, camera);
+    normalizedMousePos = new THREE.Vector2(
+        (x / window.innerWidth) * 2 - 1,
+        (y / window.innerHeight) * -2 + 1
+    );
+    raycaster.setFromCamera(normalizedMousePos, camera);
 
-        if (focusedFace != -1 && hoveringButton == -1) {
-            for (let link = 0; link < buttonBackgrounds[focusedFace].length; link++) {
-                if (raycaster.intersectObject(buttonBackgrounds[focusedFace][link]).length > 0) {
-                    hoveringButton = link;
-                    document.body.style.cursor = 'pointer';
-                }
+    if (focusedFace != -1 && hoveringButton == -1) {
+        for (let link = 0; link < buttonBackgrounds[focusedFace].length; link++) {
+            if (raycaster.intersectObject(buttonBackgrounds[focusedFace][link]).length > 0) {
+                hoveringButton = link;
+                document.body.style.cursor = 'pointer';
             }
-        } else if (focusedFace != -1 && hoveringButton != -1) {
-            if (raycaster.intersectObject(buttonBackgrounds[focusedFace][hoveringButton]) == 0) {
-                hoveringButton = -1;
-                document.body.style.cursor = 'default';
-            }
+        }
+    } else if (focusedFace != -1 && hoveringButton != -1) {
+        if (raycaster.intersectObject(buttonBackgrounds[focusedFace][hoveringButton]) == 0) {
+            hoveringButton = -1;
+            document.body.style.cursor = 'default';
         }
     }
 }
