@@ -566,7 +566,6 @@ function animate() {
     shapeGlowMesh.position.copy(shapeZPivot.position);
 
     const normalMatrix = new THREE.Matrix3().getNormalMatrix(shapeFrontMesh.matrixWorld);
-    const shapeNormals = dodecahedronGeometry.attributes.normal.array;
     var highestDot = -1;
     var bestIndex = -1;
     var bestNormal = null;
