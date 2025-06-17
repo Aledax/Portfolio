@@ -1,31 +1,48 @@
 import * as THREE from 'https://esm.sh/three@0.160.1';
 import { Text } from 'https://esm.sh/troika-three-text@0.48.0?deps=three@0.160.1';
-import { createDodecahedronGeometry } from './dodecahedron.js';
+import { dodecahedronFaceCount, createDodecahedronGeometry } from './dodecahedron.js';
 import { shapeVertexShader, shapeFrontFragmentShader, shapeBackFragmentShader, buttonVertexShader, buttonFragmentShader } from './shaders.js';
 import { projectData } from './projectdata.js';
+import { shuffle } from './shuffle.js';
 
 // Parameters
 
 const cameraPosition = new THREE.Vector3(0, 0, 5);
+const cameraFOV = 50;
+const cameraNear = 0.1;
+const cameraFar = 1000;
 
-const shapeRotationHeldSpeed = 0.005;
+const shapePosition = new THREE.Vector3(0, 0.31, 0);
+const shapeToCamera = cameraPosition.clone().sub(shapePosition).normalize();
+const shapeRadius = 1;
+
+const shapeGlowOpacity = 0.85;
+const shapeGlowWidth = 2.5;
+
+const shapeRotationHeldSpeed = 0.005 / shapeRadius;
 const shapeRotationHeldAcceleration = 0.5;
 const shapeRotationHeldDeceleration = 0.75;
 const shapeRotationFocusedAcceleration = 5;
 const shapeRotationFocusedDeceleration = 0.9;
 const shapeRotationFreeDeceleration = 0.95;
-const shapeFocusMaximumSpeed = 10;
-const backgroundSkyScrollSpeed = -0.75;
-const backgroundStarsScrollSpeed = -0.85;
-const backgroundStarsScrollSpeed2 = -1.15;
-const shapePosition = new THREE.Vector3(0, 0.31, 0);
-const shapeToCamera = cameraPosition.clone().sub(shapePosition).normalize();
-const shapeRadius = 1;
+
 const shapeFloatAmplitude = 0.075;
 const shapeFloatPeriod = 5;
 const shapeFloatRotationAmplitude = 0.05;
 const shapeFloatRotationOffset = shapeFloatPeriod * 0.25;
+
+const shapeFocusMaximumSpeed = 10;
 const shapeFocusRequiredDot = 0.94;
+
+const iconGlowWidth = 0.75;
+const iconFlashWidth = 1.5;
+const iconDiscoveredOpacity = 0.9;
+const iconFocusLerp = 0.4;
+const iconFlashLerp = 0.95;
+
+const backgroundSkyScrollSpeed = -0.75 / shapeRadius;
+const backgroundStarsMidScrollSpeed = -0.85 / shapeRadius;
+const backgroundStarsFrontScrollSpeed = -1.15 / shapeRadius;
 
 const titleFont = '../assets/fonts/Sophiecomic-Regular.ttf';
 const titleSize = 0.55;
@@ -80,44 +97,71 @@ const buttonFloatButtonPhaseOffset = 2;
 // Three Objects
 
 var scene, camera, renderer, clock;
-var glowMesh, dodecahedronGeometry, shapeZPivot, shapeBack, shapeFront;
+var shapeGlowMesh, shapeZPivot, shapeBackMesh, shapeFrontMesh;
+
+const dodecahedronGeometry = createDodecahedronGeometry(shapeRadius);
+const dodecahedronNormalArray = dodecahedronGeometry.attributes.normal.array;
+const dodecahedronNormals = []
+for (let i = 0; i < dodecahedronFaceCount; i++) {
+    dodecahedronNormals.push(new THREE.Vector3(
+        dodecahedronNormalArray[i*45],
+        dodecahedronNormalArray[i*45+1],
+        dodecahedronNormalArray[i*45+2]
+    ).normalize());
+}
+const barycentric = [];
+for (let i = 0; i < 60; i++) {
+    barycentric.push(1, 0, 0);
+    barycentric.push(0, 1, 0);
+    barycentric.push(0, 0, 1);
+}
+dodecahedronGeometry.setAttribute('barycentric', new THREE.Float32BufferAttribute(barycentric, 3));
+
+const shapeFaceCount = dodecahedronFaceCount;
 
 var iconPlaceholders = Array(12).fill(null);
-var activatedIconMeshes = Array(12).fill(null);
+var iconBrightMeshes = Array(12).fill(null);
 var iconGlowMeshes = Array(12).fill(null);
 var iconFlashMeshes = Array(12).fill(null);
 
-var titleLetterTexts = [];
-var titleLetterPlaceholders = [];
-var titleLetterPlaceholderPositions = [];
 var allTitlesPlaceholder = new THREE.Object3D();
+var titleLetterPlaceholderPositions = [];
+var titleLetterPlaceholders = [];
+var titleLetterTexts = [];
 
-var bodyLineTexts = [];
-var bodyPlaceholders = [];
 var allBodiesPlaceholder = new THREE.Object3D();
+var bodyPlaceholders = [];
+var bodyLineTexts = [];
 
+var allButtonsPlaceholder = new THREE.Object3D();
 var buttonPlaceholders = [];
-var buttonBackgrounds = [];
+var buttonBackgroundMeshes = [];
 var buttonTexts = [];
 
 // States
 
 var shapeMouseDown = false;
+
 var mousePos = new THREE.Vector2();
 var mouseVelocity = new THREE.Vector2();
 var normalizedMousePos = new THREE.Vector2();
+
 var backgroundSkyScrollPos = new THREE.Vector2(0, 0);
-var backgroundStarsScrollPos = new THREE.Vector2(0, 0);
-var backgroundStarsScrollPos2 = new THREE.Vector2(0, 0);
+var backgroundStarsMidScrollPos = new THREE.Vector2(0, 0);
+var backgroundStarsFrontScrollPos = new THREE.Vector2(0, 0);
+
 var raycaster = new THREE.Raycaster();
+
 var focusedFace = -1;
 var discoveredFaces = Array(12).fill(false);
-var focusedTime = 0;
+var focusedStopwatch = 0;
+
 var hoveringButton = -1;
+
 var songCounter = 0;
 var radioFace;
 var radioSongs;
-for (let face = 0; face < projectData.length; face++) {
+for (let face = 0; face < shapeFaceCount; face++) {
     if (projectData[face].name == 'Space Radio') {
         radioFace = face;
         radioSongs = [...projectData[face].links[0].links];
@@ -136,16 +180,17 @@ function syncTextPromise(text) {
 
 init();
 
+/** Initialization function for the THREE.js scene. */
 function init() {
     
-    // WINDOW
+    // SCENE & CAMERA
 
     scene = new THREE.Scene();
     camera = new THREE.PerspectiveCamera(
-        50,
+        cameraFOV,
         window.innerWidth/window.innerHeight,
-        0.1,
-        1000);
+        cameraNear,
+        cameraFar);
     renderer = new THREE.WebGLRenderer({
         alpha: true,
         antialias: true
@@ -155,6 +200,8 @@ function init() {
 
     clock = new THREE.Clock();
     clock.start();
+
+    // EVENTS
 
     document.body.appendChild(renderer.domElement);
     document.addEventListener('mousedown', e => {
@@ -191,26 +238,16 @@ function init() {
         import.meta.url
     );
     const glowTexture = glowLoader.load(glowURL);
-    const glowMaterial = new THREE.MeshBasicMaterial({
+    const shapeGlowMaterial = new THREE.MeshBasicMaterial({
         map: glowTexture,
         transparent: true,
-        opacity: 0.85,
+        opacity: shapeGlowOpacity,
         depthWrite: false,
         blending: THREE.AdditiveBlending
     });
-    const glowGeometry = new THREE.PlaneGeometry(2.5, 2.5);
-    glowMesh = new THREE.Mesh(glowGeometry, glowMaterial);
-    scene.add(glowMesh);
-
-    dodecahedronGeometry = createDodecahedronGeometry(shapeRadius);
-    const shapeNormals = dodecahedronGeometry.attributes.normal.array;
-    const barycentric = [];
-    for (let i = 0; i < 60; i++) {
-        barycentric.push(1, 0, 0);
-        barycentric.push(0, 1, 0);
-        barycentric.push(0, 0, 1);
-    }
-    dodecahedronGeometry.setAttribute('barycentric', new THREE.Float32BufferAttribute(barycentric, 3));
+    const shapeGlowGeometry = new THREE.PlaneGeometry(shapeGlowWidth * shapeRadius, shapeGlowWidth * shapeRadius);
+    shapeGlowMesh = new THREE.Mesh(shapeGlowGeometry, shapeGlowMaterial);
+    scene.add(shapeGlowMesh);
 
     shapeZPivot = new THREE.Object3D();
     scene.add(shapeZPivot)
@@ -227,43 +264,38 @@ function init() {
         fragmentShader: shapeFrontFragmentShader
     });
     shapeBackMaterial.depthTest = false;
-    shapeBack = new THREE.Mesh(dodecahedronGeometry, shapeBackMaterial);
-    shapeFront = new THREE.Mesh(dodecahedronGeometry, shapeFrontMaterial);
+    shapeBackMesh = new THREE.Mesh(dodecahedronGeometry, shapeBackMaterial);
+    shapeFrontMesh = new THREE.Mesh(dodecahedronGeometry, shapeFrontMaterial);
     
     const initialQuaternion = new THREE.Quaternion();
     initialQuaternion.setFromAxisAngle(new THREE.Vector3(1, 0, 0), -55 * Math.PI / 180);
-    shapeBack.quaternion.premultiply(initialQuaternion);
-    shapeFront.quaternion.premultiply(initialQuaternion);
-    shapeZPivot.add(shapeBack);
-    shapeZPivot.add(shapeFront);
-    shapeFront.renderOrder = 1;
-    shapeBack.renderOrder = 0;
+    shapeBackMesh.quaternion.premultiply(initialQuaternion);
+    shapeFrontMesh.quaternion.premultiply(initialQuaternion);
+    shapeZPivot.add(shapeFrontMesh);
+    shapeZPivot.add(shapeBackMesh);
+    shapeFrontMesh.renderOrder = 1;
+    shapeBackMesh.renderOrder = 0;
 
     // ICONS
 
-    const iconGlowGeometry = new THREE.PlaneGeometry(0.75, 0.75);
-    const iconFlashGeometry = new THREE.PlaneGeometry(1.5, 1.5);
+    const iconGlowGeometry = new THREE.PlaneGeometry(iconGlowWidth * shapeRadius, iconGlowWidth * shapeRadius);
+    const iconFlashGeometry = new THREE.PlaneGeometry(iconFlashWidth * shapeRadius, iconFlashWidth * shapeRadius);
     const loadingManager = new THREE.LoadingManager();
     loadingManager.onLoad = () => {
-        shapeFront.updateMatrixWorld(true);
+        shapeFrontMesh.updateMatrixWorld(true);
 
         for (let i = 0; i < 12; i++) {
-            const normal = new THREE.Vector3(
-                shapeNormals[i*45],
-                shapeNormals[i*45+1],
-                shapeNormals[i*45+2]
-            ).normalize();
-
-            iconPlaceholders[i].position.copy(normal.clone().multiplyScalar(0.8));
-            iconPlaceholders[i].lookAt(normal.clone().multiplyScalar(2).applyMatrix4(shapeFront.matrixWorld));
-            console.log(i, normal.clone().multiplyScalar(2).applyMatrix4(shapeFront.matrixWorld));
+            var normal = dodecahedronNormals[i];
+            iconPlaceholders[i].position.copy(normal.clone().multiplyScalar(0.8 * shapeRadius));
+            iconPlaceholders[i].lookAt(normal.clone().multiplyScalar(2 * shapeRadius).applyMatrix4(shapeFrontMesh.matrixWorld));
+            console.log(i, normal.clone().multiplyScalar(2 * shapeRadius).applyMatrix4(shapeFrontMesh.matrixWorld));
         }
 
         readyCounter += 1;
     };
     const iconLoader = new THREE.TextureLoader(loadingManager);
 
-    for (let i = 0; i < 12; i++) {
+    for (let i = 0; i < shapeFaceCount; i++) {
 
         let iconPath = `../assets/images/icons/activated/icon${i}.png?as=webp`;
 
@@ -292,20 +324,20 @@ function init() {
             if (projectData[i].iconSize) {
                 iconScale = projectData[i].iconSize;
             }
-            const iconGeometry = new THREE.PlaneGeometry(0.5 * iconScale, 0.5 * iconScale);
+            const iconGeometry = new THREE.PlaneGeometry(0.5 * iconScale * shapeRadius, 0.5 * iconScale * shapeRadius);
             const iconPlaceholder = new THREE.Object3D();
             const activatedIconMesh = new THREE.Mesh(iconGeometry, activatedIconMaterial.clone());
-            const iconGlowMesh = new THREE.Mesh(iconGlowGeometry, glowMaterial.clone());
-            const iconFlashMesh = new THREE.Mesh(iconFlashGeometry, glowMaterial.clone());
+            const iconGlowMesh = new THREE.Mesh(iconGlowGeometry, shapeGlowMaterial.clone());
+            const iconFlashMesh = new THREE.Mesh(iconFlashGeometry, shapeGlowMaterial.clone());
             iconPlaceholders[i] = iconPlaceholder;
-            activatedIconMeshes[i] = activatedIconMesh;
+            iconBrightMeshes[i] = activatedIconMesh;
             activatedIconMesh.renderOrder = 2;
             iconGlowMesh.material.opacity = 0;
             iconGlowMeshes[i] = iconGlowMesh;
             iconFlashMesh.material.opacity = 0;
             iconFlashMeshes[i] = iconFlashMesh;
             
-            shapeFront.add(iconPlaceholder);
+            shapeFrontMesh.add(iconPlaceholder);
             iconPlaceholder.add(activatedIconMesh);
             iconPlaceholder.add(iconGlowMesh);
             iconPlaceholder.add(iconFlashMesh);
@@ -316,18 +348,25 @@ function init() {
 
     allTitlesPlaceholder.position.set(0, titleY, 0);
     allBodiesPlaceholder.position.set(0, bodyY, 0);
+    allButtonsPlaceholder.position.set(0, buttonY, 0);
 
-    for (let i = 0; i < 12; i++) {
+    scene.add(allTitlesPlaceholder);
+    scene.add(allBodiesPlaceholder);
+    scene.add(allButtonsPlaceholder);
+
+    for (let i = 0; i < shapeFaceCount; i++) {
+
         const data = projectData[i];
 
         // Title
 
-        const letterTexts = [];
-        const letterPlaceholders = [];
+        const thisTitleLetterTexts = [];
+        const thisTitleLetterPlaceholders = [];
         titleLetterPlaceholderPositions.push([]);
         const thisTitleSize = data.nameSize ? titleSize * data.nameSize : titleSize;
 
         for (let letter = 0; letter < data.name.length; letter++) {
+
             const text = new Text();
             text.font = titleFont;
             text.text = data.name[letter];
@@ -340,22 +379,25 @@ function init() {
                 text.text = 'l';
                 text.material.opacity = 0;
             }
-            letterTexts.push(text);
 
             const placeholder = new THREE.Object3D();
             placeholder.scale.set(0, 0, 1);
             placeholder.add(text);
-            scene.add(placeholder);
-            letterPlaceholders.push(placeholder);
+            allTitlesPlaceholder.add(placeholder);
+
+            thisTitleLetterTexts.push(text);
+            thisTitleLetterPlaceholders.push(placeholder);
         }
 
-        Promise.all(letterTexts.map(syncTextPromise)).then(() => {
+        Promise.all(thisTitleLetterTexts.map(syncTextPromise)).then(() => {
+            
             const kerning = titleKerning;
             let totalWidth = 0.0;
             const letterWidths = [];
-            for (let letter = 0; letter < letterTexts.length; letter++) {
-                letterTexts[letter].geometry.computeBoundingBox();
-                const bbox = letterTexts[letter].geometry.boundingBox;
+
+            for (let letter = 0; letter < thisTitleLetterTexts.length; letter++) {
+                thisTitleLetterTexts[letter].geometry.computeBoundingBox();
+                const bbox = thisTitleLetterTexts[letter].geometry.boundingBox;
                 const size = new THREE.Vector3();
                 bbox.getSize(size);
                 totalWidth += size.x;
@@ -366,10 +408,11 @@ function init() {
             }
 
             let incrementalWidth = 0;
-            for (let letter = 0; letter < letterTexts.length; letter++) {
-                const letterCenter = new THREE.Vector3(-totalWidth / 2 + incrementalWidth + letterWidths[letter] / 2, titleY, 0);
+
+            for (let letter = 0; letter < thisTitleLetterTexts.length; letter++) {
+                const letterCenter = new THREE.Vector3(-totalWidth / 2 + incrementalWidth + letterWidths[letter] / 2, 0, 0);
                 const letterTopLeft = new THREE.Vector3(-letterWidths[letter] / 2, thisTitleSize / 2, 0);
-                letterTexts[letter].position.copy(letterTopLeft);
+                thisTitleLetterTexts[letter].position.copy(letterTopLeft);
                 incrementalWidth += letterWidths[letter] + kerning;
                 titleLetterPlaceholderPositions[i].push(letterCenter);
             }
@@ -377,8 +420,8 @@ function init() {
             readyCounter += 1;
         });
 
-        titleLetterTexts.push(letterTexts);
-        titleLetterPlaceholders.push(letterPlaceholders);
+        titleLetterTexts.push(thisTitleLetterTexts);
+        titleLetterPlaceholders.push(thisTitleLetterPlaceholders);
 
         // Body
 
@@ -387,7 +430,6 @@ function init() {
         const thisBodyPlaceholder = new THREE.Object3D();
         thisBodyPlaceholder.scale.set(0, 0, 1);
         bodyPlaceholders.push(thisBodyPlaceholder);
-        scene.add(allBodiesPlaceholder);
         allBodiesPlaceholder.add(thisBodyPlaceholder);
 
         if (data.description) {
@@ -406,6 +448,7 @@ function init() {
         }
 
         Promise.all(thisBodyLineTexts.map(syncTextPromise)).then(() => {
+            
             var totalHeight;
 
             for (let line = 0; line < thisBodyLineTexts.length; line++) {
@@ -437,9 +480,9 @@ function init() {
                 const linkData = data.links[link];
 
                 const placeholder = new THREE.Object3D();
-                placeholder.position.set(((data.links.length - 1) / -2 + link) * buttonInterval, buttonY, 0);
+                placeholder.position.set(((data.links.length - 1) / -2 + link) * buttonInterval, 0, 0);
                 placeholder.scale.set(0, 0, 1);
-                scene.add(placeholder);
+                allButtonsPlaceholder.add(placeholder);
                 thisButtonPlaceholders.push(placeholder);
 
                 const material = new THREE.ShaderMaterial({
@@ -485,7 +528,7 @@ function init() {
         });
 
         buttonPlaceholders.push(thisButtonPlaceholders);
-        buttonBackgrounds.push(thisButtonBackgrounds);
+        buttonBackgroundMeshes.push(thisButtonBackgrounds);
         buttonTexts.push(thisButtonTexts);
     }
 
@@ -494,13 +537,7 @@ function init() {
     animate();
 }
 
-function rotateShape() {
-    const q = new THREE.Quaternion();
-    q.setFromAxisAngle(new THREE.Vector3(mouseVelocity.y, mouseVelocity.x, 0).normalize(), shapeRotationHeldSpeed * mouseVelocity.length());
-    shapeBack.quaternion.premultiply(q);
-    shapeFront.quaternion.premultiply(q);
-}
-
+/** Per-frame update call. */
 function animate() {
 
     requestAnimationFrame(animate);
@@ -517,7 +554,7 @@ function animate() {
     const elapsed = clock.getDelta();
 
     if (focusedFace != -1) {
-        focusedTime += elapsed;
+        focusedStopwatch += elapsed;
     }
 
     const rotationZ = shapeFloatRotationAmplitude * Math.cos(clock.getElapsedTime() * Math.PI * 2 / shapeFloatPeriod - shapeFloatRotationOffset);
@@ -526,19 +563,16 @@ function animate() {
     const floatY = shapeFloatAmplitude * Math.cos(clock.getElapsedTime() * Math.PI * 2 / shapeFloatPeriod);
     shapeZPivot.position.copy(shapePosition.clone().add(new THREE.Vector3(0, floatY, 0)));
 
-    glowMesh.position.copy(shapeZPivot.position);
+    shapeGlowMesh.position.copy(shapeZPivot.position);
 
-    const normalMatrix = new THREE.Matrix3().getNormalMatrix(shapeFront.matrixWorld);
+    const normalMatrix = new THREE.Matrix3().getNormalMatrix(shapeFrontMesh.matrixWorld);
     const shapeNormals = dodecahedronGeometry.attributes.normal.array;
     var highestDot = -1;
     var bestIndex = -1;
     var bestNormal = null;
-    var localNormals = [];
     var worldNormals = [];
-    for (let i = 0; i < 12; i++) {
-        const localNormal = new THREE.Vector3(shapeNormals[i*45], shapeNormals[(i*45)+1], shapeNormals[(i*45)+2]).normalize();
-        localNormals.push(localNormal);
-        const worldNormal = localNormal.applyMatrix3(normalMatrix).normalize();
+    for (let i = 0; i < shapeFaceCount; i++) {
+        const worldNormal = dodecahedronNormals[i].clone().applyMatrix3(normalMatrix).normalize();
         const dot = worldNormal.dot(shapeToCamera);
         if (dot > highestDot) {
             highestDot = dot;
@@ -548,29 +582,29 @@ function animate() {
         worldNormals.push(worldNormal);
     }
 
-    for (let i = 0; i < 12; i++) {
+    for (let i = 0; i < shapeFaceCount; i++) {
         if (i == focusedFace) {
             const localX = new THREE.Vector3(1, 0, 0);
-            const worldX = localX.clone().applyQuaternion(activatedIconMeshes[i].getWorldQuaternion(new THREE.Quaternion()));
+            const worldX = localX.clone().applyQuaternion(iconBrightMeshes[i].getWorldQuaternion(new THREE.Quaternion()));
             const currentAngle = Math.atan2(worldX.y, worldX.x);
-            activatedIconMeshes[i].rotation.set(0, 0, activatedIconMeshes[i].rotation.z - currentAngle * 0.1);
+            iconBrightMeshes[i].rotation.set(0, 0, iconBrightMeshes[i].rotation.z - currentAngle * 0.1);
         }
         if (discoveredFaces[i]) {
-            activatedIconMeshes[i].material.opacity += 0.4 * (0.9 - activatedIconMeshes[i].material.opacity);
-            iconGlowMeshes[i].material.opacity += 0.4 * (0.9 - iconGlowMeshes[i].material.opacity);
+            iconBrightMeshes[i].material.opacity += iconFocusLerp * (iconDiscoveredOpacity - iconBrightMeshes[i].material.opacity);
+            iconGlowMeshes[i].material.opacity += iconFocusLerp * (iconDiscoveredOpacity - iconGlowMeshes[i].material.opacity);
         } else {
             const brightness = Math.pow(Math.max(0, worldNormals[i].dot(shapeToCamera)), 6) * 0.5;
-            activatedIconMeshes[i].material.opacity += 0.4 * (brightness - activatedIconMeshes[i].material.opacity);
-            iconGlowMeshes[i].material.opacity += 0.4 * (brightness - iconGlowMeshes[i].material.opacity);
+            iconBrightMeshes[i].material.opacity += iconFocusLerp * (brightness - iconBrightMeshes[i].material.opacity);
+            iconGlowMeshes[i].material.opacity += iconFocusLerp * (brightness - iconGlowMeshes[i].material.opacity);
         }
-        iconFlashMeshes[i].material.opacity *= 0.95;
+        iconFlashMeshes[i].material.opacity *= iconFlashLerp;
     }
 
     if (!shapeMouseDown && focusedFace == -1 && bestIndex != -1 && highestDot >= shapeFocusRequiredDot && mouseVelocity.length() <= shapeFocusMaximumSpeed) {
         focusedFace = bestIndex;
         discoveredFaces[focusedFace] = true;
-        focusedTime = 0;
-        activatedIconMeshes[focusedFace].material.opacity = 1;
+        focusedStopwatch = 0;
+        iconBrightMeshes[focusedFace].material.opacity = 1;
         iconGlowMeshes[focusedFace].material.opacity = 1;
         iconFlashMeshes[focusedFace].material.opacity = 1;
     }
@@ -579,12 +613,12 @@ function animate() {
         focusedFace = -1;
     }
 
-    for (let i = 0; i < 12; i++) {
+    for (let i = 0; i < shapeFaceCount; i++) {
 
         // Titles
 
         for (let letter = 0; letter < titleLetterPlaceholders[i].length; letter++) {
-            const show = (i == focusedFace && focusedTime >= letter * titleShrinkInterval);
+            const show = (i == focusedFace && focusedStopwatch >= letter * titleShrinkInterval);
 
             const targetScale = show ? 1 : 0;
             const currentScale = titleLetterPlaceholders[i][letter].scale.x;
@@ -598,7 +632,7 @@ function animate() {
 
             if (show) {
                 const newPosition = titleLetterPlaceholderPositions[i][letter].clone();
-                newPosition.y = titleY + titleFloatAmplitude * Math.cos(clock.getElapsedTime() * Math.PI * 2 / titleFloatPeriod - titleFloatLetterPhaseOffset * letter);
+                newPosition.y = titleFloatAmplitude * Math.cos(clock.getElapsedTime() * Math.PI * 2 / titleFloatPeriod - titleFloatLetterPhaseOffset * letter);
                 titleLetterPlaceholders[i][letter].position.copy(newPosition);
                 titleLetterPlaceholders[i][letter].rotation.z = titleFloatRotationAmplitude * Math.cos(clock.getElapsedTime() * Math.PI * 2 / titleFloatPeriod - titleFloatRotationPhaseOffset - titleFloatLetterPhaseOffset * letter);
             }
@@ -624,7 +658,7 @@ function animate() {
             const newScale = currentScale + buttonShrinkLerp * (targetScale - currentScale);
             buttonPlaceholders[i][link].scale.set(newScale, newScale, 1);
         
-            buttonPlaceholders[i][link].position.y = buttonY + buttonFloatAmplitude * Math.cos(clock.getElapsedTime() * Math.PI * 2 / buttonFloatPeriod - buttonFloatButtonPhaseOffset * link);
+            buttonPlaceholders[i][link].position.y = buttonFloatAmplitude * Math.cos(clock.getElapsedTime() * Math.PI * 2 / buttonFloatPeriod - buttonFloatButtonPhaseOffset * link);
             buttonPlaceholders[i][link].rotation.z = buttonFloatRotationAmplitude * Math.cos(clock.getElapsedTime() * Math.PI * 2 / buttonFloatPeriod - buttonFloatRotationPhaseOffset - buttonFloatButtonPhaseOffset * link);
         }
     }
@@ -642,17 +676,23 @@ function animate() {
             mouseVelocity.multiplyScalar(shapeRotationFreeDeceleration);
         }
     }
-    rotateShape();
+
+    const q = new THREE.Quaternion();
+    q.setFromAxisAngle(new THREE.Vector3(mouseVelocity.y, mouseVelocity.x, 0).normalize(), shapeRotationHeldSpeed * mouseVelocity.length());
+    shapeBackMesh.quaternion.premultiply(q);
+    shapeFrontMesh.quaternion.premultiply(q);
 
     renderer.render(scene, camera);
 
     backgroundSkyScrollPos.add(new THREE.Vector2(mouseVelocity.x * backgroundSkyScrollSpeed, mouseVelocity.y * backgroundSkyScrollSpeed));
-    backgroundStarsScrollPos.add(new THREE.Vector2(mouseVelocity.x * backgroundStarsScrollSpeed, mouseVelocity.y * backgroundStarsScrollSpeed));
-    backgroundStarsScrollPos2.add(new THREE.Vector2(mouseVelocity.x * backgroundStarsScrollSpeed2, mouseVelocity.y * backgroundStarsScrollSpeed2));
-    document.body.style.backgroundPosition = `${backgroundStarsScrollPos.x}px ${backgroundStarsScrollPos.y}px, ${backgroundStarsScrollPos2.x}px ${backgroundStarsScrollPos2.y}px, ${backgroundSkyScrollPos.x}px ${backgroundSkyScrollPos.y}px`;
+    backgroundStarsMidScrollPos.add(new THREE.Vector2(mouseVelocity.x * backgroundStarsMidScrollSpeed, mouseVelocity.y * backgroundStarsMidScrollSpeed));
+    backgroundStarsFrontScrollPos.add(new THREE.Vector2(mouseVelocity.x * backgroundStarsFrontScrollSpeed, mouseVelocity.y * backgroundStarsFrontScrollSpeed));
+    document.body.style.backgroundPosition = `${backgroundStarsFrontScrollPos.x}px ${backgroundStarsFrontScrollPos.y}px, ${backgroundStarsMidScrollPos.x}px ${backgroundStarsMidScrollPos.y}px, ${backgroundSkyScrollPos.x}px ${backgroundSkyScrollPos.y}px`;
 }
 
+/** Check whether the mouse is hovering over any buttons and update accordingly. */
 function updateHoveringLink(x, y) {
+
     normalizedMousePos = new THREE.Vector2(
         (x / window.innerWidth) * 2 - 1,
         (y / window.innerHeight) * -2 + 1
@@ -660,28 +700,23 @@ function updateHoveringLink(x, y) {
     raycaster.setFromCamera(normalizedMousePos, camera);
 
     if (focusedFace != -1 && hoveringButton == -1) {
-        for (let link = 0; link < buttonBackgrounds[focusedFace].length; link++) {
-            if (raycaster.intersectObject(buttonBackgrounds[focusedFace][link]).length > 0) {
+        for (let link = 0; link < buttonBackgroundMeshes[focusedFace].length; link++) {
+            if (raycaster.intersectObject(buttonBackgroundMeshes[focusedFace][link]).length > 0) {
                 hoveringButton = link;
                 document.body.style.cursor = 'pointer';
             }
         }
     } else if (focusedFace != -1 && hoveringButton != -1) {
-        if (raycaster.intersectObject(buttonBackgrounds[focusedFace][hoveringButton]) == 0) {
+        if (raycaster.intersectObject(buttonBackgroundMeshes[focusedFace][hoveringButton]) == 0) {
             hoveringButton = -1;
             document.body.style.cursor = 'default';
         }
     }
 }
 
-function shuffle(array) {
-    for (let i = 0; i < array.length; i++) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [array[i], array[j]] = [array[j], array[i]];
-    }
-}
-
+/** Attempt to open a button link, if hovering. */
 function tryOpenLink() {
+
     if (focusedFace != -1 && hoveringButton != -1) {
         if (focusedFace == radioFace) {
             window.open(radioSongs[songCounter], '_blank');
@@ -697,6 +732,7 @@ function tryOpenLink() {
     }
 }
 
+/** Callback function for click and touch events. */
 function onPress(x, y) {
 
     if (!ready) return;
@@ -721,11 +757,13 @@ function onPress(x, y) {
     updateHoveringLink(x, y);
 }
 
+/** Callback function for release and tap end events. */
 function onRelease() {
 
     shapeMouseDown = false;
 }
 
+/** Callback function for moving the mouse or dragging the screen. */
 function onMove(x, y) {
 
     if (shapeMouseDown) {
@@ -737,6 +775,7 @@ function onMove(x, y) {
     updateHoveringLink(x, y);
 }
 
+/** Callback function for resizing the window. */
 function onWindowResize() {
 
     camera.aspect = window.innerWidth / window.innerHeight;

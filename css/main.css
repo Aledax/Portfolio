@@ -1,7 +1,7 @@
 body {
     background-color: black;
-    background-image: url('../assets/images/starsmid.png'), url('../assets/images/starsfront.png'), url('../assets/images/background4.png');
-    background-size: 750px, 500px, 1000px;
+    background-image: url('../assets/images/starsfront.png'), url('../assets/images/starsmid.png'), url('../assets/images/background4.png');
+    background-size: 500px, 750px, 1000px;
     margin: 0px;
     padding: 0px;
     height: 100vh;
